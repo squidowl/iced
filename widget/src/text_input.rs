@@ -850,7 +850,17 @@ where
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. })
             | Event::Touch(touch::Event::FingerLost { .. }) => {
-                state::<Renderer>(tree).is_dragging = None;
+                let state = state::<Renderer>(tree);
+
+                state.is_dragging = None;
+
+                if cfg!(target_os = "linux") {
+                    update_primary_clipboard(
+                        clipboard,
+                        &self.value,
+                        state.cursor,
+                    );
+                }
             }
             Event::Mouse(mouse::Event::CursorMoved { position })
             | Event::Touch(touch::Event::FingerMoved { position, .. }) => {
@@ -1171,6 +1181,14 @@ where
                                 focus.updated_at = Instant::now();
 
                                 shell.request_redraw();
+
+                                if cfg!(target_os = "linux") {
+                                    update_primary_clipboard(
+                                        clipboard,
+                                        &self.value,
+                                        state.cursor,
+                                    );
+                                }
                             }
 
                             shell.capture_event();
@@ -1203,6 +1221,14 @@ where
                                 focus.updated_at = Instant::now();
 
                                 shell.request_redraw();
+
+                                if cfg!(target_os = "linux") {
+                                    update_primary_clipboard(
+                                        clipboard,
+                                        &self.value,
+                                        state.cursor,
+                                    );
+                                }
                             }
 
                             shell.capture_event();
@@ -1764,5 +1790,18 @@ fn alignment_offset(
             alignment::Horizontal::Center => (text_bounds_width - text_min_width) / 2.0,
             alignment::Horizontal::Right => text_bounds_width - text_min_width,
         }
+    }
+}
+
+fn update_primary_clipboard(
+    clipboard: &mut dyn Clipboard,
+    value: &Value,
+    cursor: Cursor,
+) {
+    if let Some((start, end)) = cursor.selection(value) {
+        clipboard.write(
+            clipboard::Kind::Primary,
+            value.select(start, end).to_string(),
+        );
     }
 }
