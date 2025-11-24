@@ -1268,9 +1268,13 @@ impl<Message> Update<Message> {
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => Some(Update::Release),
                 mouse::Event::CursorMoved { .. } => match state.drag_click {
-                    Some(mouse::click::Kind::Single) => {
-                        let cursor_position =
-                            cursor.position_in(bounds)? - Vector::new(padding.left, padding.top);
+                    Some(
+                        mouse::click::Kind::Single
+                        | mouse::click::Kind::Double
+                        | mouse::click::Kind::Triple,
+                    ) => {
+                        let cursor_position = cursor.position_in(bounds)?
+                            - Vector::new(padding.left, padding.top);
 
                         Some(Update::Drag(cursor_position))
                     }
