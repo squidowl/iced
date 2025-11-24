@@ -1320,7 +1320,11 @@ impl<Message> Update<Message> {
                     Some(Update::Release)
                 }
                 mouse::Event::CursorMoved { .. } => match state.drag_click {
-                    Some(mouse::click::Kind::Single) => {
+                    Some(
+                        mouse::click::Kind::Single
+                        | mouse::click::Kind::Double
+                        | mouse::click::Kind::Triple,
+                    ) => {
                         let cursor_position = cursor.position_in(bounds)?
                             - Vector::new(padding.left, padding.top);
 
