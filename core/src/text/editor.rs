@@ -387,7 +387,7 @@ impl State {
                 )))))
             }
             Event::Mouse(event) => match event {
-                mouse::Event::ButtonPressed(mouse::Button::Left) => {
+                mouse::Event::ButtonPressed { button: mouse::Button::Left, .. } => {
                     if let Some(cursor_position) = cursor.position_in(bounds) {
                         let cursor_position =
                             cursor_position - Vector::new(padding.left, padding.top);
@@ -414,7 +414,7 @@ impl State {
                         None
                     }
                 }
-                mouse::Event::ButtonPressed(mouse::Button::Middle) => {
+                mouse::Event::ButtonPressed { button: mouse::Button::Middle, .. } => {
                     if let Some(cursor_position) = cursor.position_in(bounds) {
                         let cursor_position =
                             cursor_position - Vector::new(padding.left, padding.top);

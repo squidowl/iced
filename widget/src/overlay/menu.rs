@@ -437,7 +437,10 @@ where
         let option_height = f32::from(line_height.to_absolute(text_size)) + self.padding.y();
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Left,
+                ..
+            }) => {
                 if let Some(cursor_position) = cursor.position_in(layout.bounds()) {
                     let option_index = (cursor_position.y / option_height) as usize;
 
