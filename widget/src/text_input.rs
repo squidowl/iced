@@ -665,8 +665,11 @@ where
         };
 
         match &event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Left,
+                modifiers,
+            })
+            | Event::Touch(touch::Event::FingerPressed { modifiers, .. }) => {
                 let state = state::<Renderer>(tree);
                 let cursor_before = state.cursor;
 
@@ -717,10 +720,11 @@ where
                             }
                             .unwrap_or(0);
 
-                            if state.keyboard_modifiers.shift() {
-                                state
-                                    .cursor
-                                    .select_range(state.cursor.start(&self.value), position);
+                            if modifiers.shift() {
+                                state.cursor.select_range(
+                                    state.cursor.start(&self.value),
+                                    position,
+                                );
                             } else {
                                 state.cursor.move_to(position);
                             }
@@ -764,9 +768,10 @@ where
                     shell.capture_event();
                 }
             }
-            Event::Mouse(mouse::Event::ButtonPressed(
-                mouse::Button::Middle,
-            )) if cfg!(target_os = "linux") => {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Middle,
+                ..
+            }) if cfg!(target_os = "linux") => {
                 let Some(on_input) = &self.on_input else {
                     return;
                 };
@@ -928,6 +933,7 @@ where
             Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
                 text,
+                modifiers,
                 modified_key,
                 physical_key,
                 ..
@@ -935,10 +941,8 @@ where
                 let state = state::<Renderer>(tree);
 
                 if let Some(focus) = &mut state.is_focused {
-                    let modifiers = state.keyboard_modifiers;
-
                     match key.to_latin(*physical_key) {
-                        Some('c') if state.keyboard_modifiers.command() && !self.is_secure => {
+                        Some('c') if modifiers.command() && !self.is_secure => {
                             if let Some((start, end)) = state.cursor.selection(&self.value) {
                                 clipboard.write(
                                     clipboard::Kind::Standard,
@@ -949,7 +953,7 @@ where
                             shell.capture_event();
                             return;
                         }
-                        Some('x') if state.keyboard_modifiers.command() && !self.is_secure => {
+                        Some('x') if modifiers.command() && !self.is_secure => {
                             let Some(on_input) = &self.on_input else {
                                 return;
                             };
@@ -973,8 +977,8 @@ where
                             return;
                         }
                         Some('v')
-                            if state.keyboard_modifiers.command()
-                                && !state.keyboard_modifiers.alt() =>
+                            if modifiers.command()
+                                && !modifiers.alt() =>
                         {
                             let Some(on_input) = &self.on_input else {
                                 return;
@@ -1010,7 +1014,7 @@ where
                             update_cache(state, &self.value);
                             return;
                         }
-                        Some('a') if state.keyboard_modifiers.command() => {
+                        Some('a') if modifiers.command() => {
                             let cursor_before = state.cursor;
 
                             state.cursor.select_all(&self.value);
@@ -1050,7 +1054,7 @@ where
                     }
 
                     #[cfg(target_os = "macos")]
-                    let macos_shortcut = crate::text_editor::convert_macos_shortcut(key, modifiers);
+                    let macos_shortcut = crate::text_editor::convert_macos_shortcut(key, *modifiers);
 
                     #[cfg(target_os = "macos")]
                     let modified_key = macos_shortcut.as_ref().unwrap_or(modified_key);
@@ -1238,8 +1242,6 @@ where
                             state.is_dragging = None;
                             state.is_pasting = None;
 
-                            state.keyboard_modifiers = keyboard::Modifiers::default();
-
                             shell.capture_event();
                         }
                         _ => {}
@@ -1258,11 +1260,6 @@ where
                 }
 
                 state.is_pasting = None;
-            }
-            Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
-                let state = state::<Renderer>(tree);
-
-                state.keyboard_modifiers = *modifiers;
             }
             Event::InputMethod(event) => match event {
                 input_method::Event::Opened | input_method::Event::Closed => {
@@ -1456,7 +1453,6 @@ pub struct State<P: text::Paragraph> {
     preedit: Option<input_method::Preedit>,
     last_click: Option<mouse::Click>,
     cursor: Cursor,
-    keyboard_modifiers: keyboard::Modifiers,
     // TODO: Add stateful horizontal scrolling offset
 }
 

@@ -177,8 +177,15 @@ pub fn window_event(
             let button = mouse_button(button);
 
             Some(Event::Mouse(match state {
-                winit::event::ElementState::Pressed => mouse::Event::ButtonPressed(button),
-                winit::event::ElementState::Released => mouse::Event::ButtonReleased(button),
+                winit::event::ElementState::Pressed => {
+                    mouse::Event::ButtonPressed {
+                        button,
+                        modifiers: self::modifiers(modifiers),
+                    }
+                }
+                winit::event::ElementState::Released => {
+                    mouse::Event::ButtonReleased(button)
+                }
             }))
         }
         WindowEvent::MouseWheel { delta, .. } => match delta {
@@ -295,8 +302,12 @@ pub fn window_event(
         WindowEvent::DroppedFile(path) => {
             Some(Event::Window(window::Event::FileDropped(path.clone())))
         }
-        WindowEvent::HoveredFileCancelled => Some(Event::Window(window::Event::FilesHoveredLeft)),
-        WindowEvent::Touch(touch) => Some(Event::Touch(touch_event(touch, scale_factor))),
+        WindowEvent::HoveredFileCancelled => {
+            Some(Event::Window(window::Event::FilesHoveredLeft))
+        }
+        WindowEvent::Touch(touch) => {
+            Some(Event::Touch(touch_event(touch, modifiers, scale_factor)))
+        }
         WindowEvent::Moved(position) => {
             let winit::dpi::LogicalPosition { x, y } = position.to_logical(f64::from(scale_factor));
 
@@ -521,7 +532,11 @@ pub fn cursor_position(position: winit::dpi::PhysicalPosition<f64>, scale_factor
 ///
 /// [`winit`]: https://github.com/rust-windowing/winit
 /// [`iced`]: https://github.com/iced-rs/iced/tree/0.12
-pub fn touch_event(touch: winit::event::Touch, scale_factor: f32) -> touch::Event {
+pub fn touch_event(
+    touch: winit::event::Touch,
+    modifiers: winit::keyboard::ModifiersState,
+    scale_factor: f32,
+) -> touch::Event {
     let id = touch::Finger(touch.id);
     let position = {
         let location = touch.location.to_logical::<f64>(f64::from(scale_factor));
@@ -530,10 +545,20 @@ pub fn touch_event(touch: winit::event::Touch, scale_factor: f32) -> touch::Even
     };
 
     match touch.phase {
-        winit::event::TouchPhase::Started => touch::Event::FingerPressed { id, position },
-        winit::event::TouchPhase::Moved => touch::Event::FingerMoved { id, position },
-        winit::event::TouchPhase::Ended => touch::Event::FingerLifted { id, position },
-        winit::event::TouchPhase::Cancelled => touch::Event::FingerLost { id, position },
+        winit::event::TouchPhase::Started => touch::Event::FingerPressed {
+            id,
+            position,
+            modifiers: self::modifiers(modifiers),
+        },
+        winit::event::TouchPhase::Moved => {
+            touch::Event::FingerMoved { id, position }
+        }
+        winit::event::TouchPhase::Ended => {
+            touch::Event::FingerLifted { id, position }
+        }
+        winit::event::TouchPhase::Cancelled => {
+            touch::Event::FingerLost { id, position }
+        }
     }
 }
 
