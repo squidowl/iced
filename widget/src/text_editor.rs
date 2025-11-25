@@ -1294,7 +1294,7 @@ impl<Message> Update<Message> {
 
         match event {
             Event::Mouse(event) => match event {
-                mouse::Event::ButtonPressed(button)
+                mouse::Event::ButtonPressed { button, .. }
                     if matches!(button, mouse::Button::Left)
                         || (cfg!(target_os = "linux")
                             && matches!(button, mouse::Button::Middle)) =>

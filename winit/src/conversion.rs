@@ -186,7 +186,10 @@ pub fn window_event(
 
             Some(Event::Mouse(match state {
                 winit::event::ElementState::Pressed => {
-                    mouse::Event::ButtonPressed(button)
+                    mouse::Event::ButtonPressed {
+                        button,
+                        modifiers: self::modifiers(modifiers),
+                    }
                 }
                 winit::event::ElementState::Released => {
                     mouse::Event::ButtonReleased(button)
@@ -321,7 +324,7 @@ pub fn window_event(
             Some(Event::Window(window::Event::FilesHoveredLeft))
         }
         WindowEvent::Touch(touch) => {
-            Some(Event::Touch(touch_event(touch, scale_factor)))
+            Some(Event::Touch(touch_event(touch, modifiers, scale_factor)))
         }
         WindowEvent::Moved(position) => {
             let winit::dpi::LogicalPosition { x, y } =
@@ -571,6 +574,7 @@ pub fn cursor_position(
 /// [`iced`]: https://github.com/iced-rs/iced/tree/0.12
 pub fn touch_event(
     touch: winit::event::Touch,
+    modifiers: winit::keyboard::ModifiersState,
     scale_factor: f32,
 ) -> touch::Event {
     let id = touch::Finger(touch.id);
@@ -582,9 +586,11 @@ pub fn touch_event(
     };
 
     match touch.phase {
-        winit::event::TouchPhase::Started => {
-            touch::Event::FingerPressed { id, position }
-        }
+        winit::event::TouchPhase::Started => touch::Event::FingerPressed {
+            id,
+            position,
+            modifiers: self::modifiers(modifiers),
+        },
         winit::event::TouchPhase::Moved => {
             touch::Event::FingerMoved { id, position }
         }
