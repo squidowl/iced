@@ -2632,7 +2632,7 @@ impl State {
         if let Some(last_scrolled) = self.last_scrolled {
             let clear_transaction = match event {
                 Event::Mouse(
-                    mouse::Event::ButtonPressed(_)
+                    mouse::Event::ButtonPressed { .. }
                     | mouse::Event::ButtonReleased(_)
                     | mouse::Event::CursorLeft,
                 ) => true,
@@ -2826,7 +2826,10 @@ impl State {
             // scroller, jump-drags it (with `Shift`, or with a plain press
             // when `click_to_scroll` is enabled), or presses the rail
             match event {
-                Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+                Event::Mouse(mouse::Event::ButtonPressed {
+                    button: mouse::Button::Left,
+                    ..
+                })
                 | Event::Touch(touch::Event::FingerPressed { .. }) => {
                     let Some(cursor_position) = cursor.position() else {
                         interact.stop = true;
@@ -2900,8 +2903,9 @@ impl State {
         if matches!(self.interaction, Interaction::AutoScrolling { .. })
             && matches!(
                 event,
-                Event::Mouse(mouse::Event::ButtonPressed(_) | mouse::Event::WheelScrolled { .. })
-                    | Event::Touch(_)
+                Event::Mouse(
+                    mouse::Event::ButtonPressed { .. } | mouse::Event::WheelScrolled { .. }
+                ) | Event::Touch(_)
                     | Event::Keyboard(_)
             )
         {
@@ -3022,9 +3026,10 @@ impl State {
                     update.request_redraw = true;
                 }
             }
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Middle))
-                if auto_scroll && matches!(self.interaction, Interaction::None) =>
-            {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Middle,
+                ..
+            }) if auto_scroll && matches!(self.interaction, Interaction::None) => {
                 let Some(origin) = cursor_over_scrollable else {
                     return update;
                 };

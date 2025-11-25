@@ -50,7 +50,7 @@ impl Interaction {
         Some(match event {
             Event::Mouse(mouse) => Self::Mouse(match mouse {
                 mouse::Event::CursorMoved { position } => Mouse::Move(Target::Point(*position)),
-                mouse::Event::ButtonPressed(button) => Mouse::Press {
+                mouse::Event::ButtonPressed { button, .. } => Mouse::Press {
                     button: *button,
                     target: None,
                 },
@@ -205,7 +205,12 @@ impl Interaction {
     pub fn events(&self, find_target: impl FnOnce(&Target) -> Option<Point>) -> Option<Vec<Event>> {
         let mouse_move_ = |to| Event::Mouse(mouse::Event::CursorMoved { position: to });
 
-        let mouse_press = |button| Event::Mouse(mouse::Event::ButtonPressed(button));
+        let mouse_press = |button| {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button,
+                modifiers: keyboard::Modifiers::default(),
+            })
+        };
 
         let mouse_release = |button| Event::Mouse(mouse::Event::ButtonReleased(button));
 

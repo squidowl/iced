@@ -189,7 +189,10 @@ impl canvas::Program<Message> for Viewer<'_> {
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Left,
+                modifiers: _,
+            }) => {
                 let position = cursor.position_in(bounds)? - (bounds.center() - Point::ORIGIN);
                 let row = (position.x / Self::CELL_SIZE).round() as isize;
                 let column = (position.y / Self::CELL_SIZE).round() as isize;
