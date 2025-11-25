@@ -376,7 +376,10 @@ where
         }
 
         match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            Event::Mouse(mouse::Event::ButtonPressed {
+                button: mouse::Button::Left,
+                ..
+            }) => {
                 let state = tree
                     .state
                     .downcast_mut::<State<Link, Renderer::Paragraph>>();

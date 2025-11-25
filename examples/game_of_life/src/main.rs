@@ -398,7 +398,7 @@ mod grid {
                     )
                 }
                 Event::Mouse(mouse_event) => match mouse_event {
-                    mouse::Event::ButtonPressed(button) => {
+                    mouse::Event::ButtonPressed { button, .. } => {
                         let message = match button {
                             mouse::Button::Left => {
                                 *interaction = if is_populated {

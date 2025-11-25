@@ -716,7 +716,10 @@ where
                 let mut local_shell = Shell::new(&mut local_messages);
                 self.text_input.update(
                     &mut tree.children[0],
-                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                    &Event::Mouse(mouse::Event::ButtonPressed {
+                        button: mouse::Button::Left,
+                        modifiers: keyboard::Modifiers::default(),
+                    }),
                     layout,
                     mouse::Cursor::Unavailable,
                     renderer,
