@@ -330,9 +330,10 @@ where
             };
 
             match &event {
-                Event::Mouse(mouse::Event::ButtonPressed(
-                    mouse::Button::Left,
-                ))
+                Event::Mouse(mouse::Event::ButtonPressed {
+                    button: mouse::Button::Left,
+                    ..
+                })
                 | Event::Touch(touch::Event::FingerPressed { .. }) => {
                     if let Some(cursor_position) =
                         cursor.position_over(layout.bounds())
