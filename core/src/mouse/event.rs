@@ -1,4 +1,5 @@
 use crate::Point;
+use crate::keyboard::Modifiers;
 
 use super::Button;
 
@@ -23,7 +24,12 @@ pub enum Event {
     },
 
     /// A mouse button was pressed.
-    ButtonPressed(Button),
+    ButtonPressed {
+        /// The button that was pressed.
+        button: Button,
+        /// The state of the modifier keys.
+        modifiers: Modifiers,
+    },
 
     /// A mouse button was released.
     ButtonReleased(Button),
