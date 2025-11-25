@@ -686,14 +686,20 @@ where
             self.key_binding.as_deref(),
         ) {
             match update {
-                Update::Click(click) => {
+                Update::Click(click, modifiers) => {
                     state.focus = Some(Focus::now());
                     state.last_click = Some(click);
 
                     match click.button() {
                         mouse::Button::Left => {
                             let action = match click.kind() {
-                                mouse::click::Kind::Single => Action::Click(click.position()),
+                                mouse::click::Kind::Single => {
+                                    if modifiers.shift() {
+                                        Action::Drag(click.position())
+                                    } else {
+                                        Action::Click(click.position())
+                                    }
+                                }
                                 mouse::click::Kind::Double => Action::SelectWord,
                                 mouse::click::Kind::Triple => Action::SelectLine,
                             };
@@ -715,9 +721,18 @@ where
                 Update::Drag(position) => {
                     shell.publish(on_edit(Action::Drag(position)));
                 }
-                Update::Release => {
+                Update::ButtonRelease => {
                     state.drag_click = None;
 
+                    if cfg!(target_os = "linux")
+                        && state.focus.is_some()
+                        && let Some(selection) = self.content.selection()
+                        && !selection.is_empty()
+                    {
+                        shell.write_clipboard_primary(clipboard::Content::Text(selection));
+                    }
+                }
+                Update::KeyRelease => {
                     if cfg!(target_os = "linux")
                         && state.focus.is_some()
                         && let Some(selection) = self.content.selection()
@@ -1195,9 +1210,10 @@ impl<Message> Binding<Message> {
 }
 
 enum Update<Message> {
-    Click(mouse::Click),
+    Click(mouse::Click, keyboard::Modifiers),
     Drag(Point),
-    Release,
+    ButtonRelease,
+    KeyRelease,
     Scroll(f32),
     InputMethod(Ime),
     Binding(Binding<Message>),
@@ -1225,7 +1241,7 @@ impl<Message> Update<Message> {
 
         match event {
             Event::Mouse(event) => match event {
-                mouse::Event::ButtonPressed { button, .. }
+                mouse::Event::ButtonPressed { button, modifiers }
                     if matches!(button, mouse::Button::Left)
                         || (cfg!(target_os = "linux")
                             && matches!(button, mouse::Button::Middle)) =>
@@ -1236,14 +1252,14 @@ impl<Message> Update<Message> {
 
                         let click = mouse::Click::new(cursor_position, *button, state.last_click);
 
-                        Some(Update::Click(click))
+                        Some(Update::Click(click, *modifiers))
                     } else if state.focus.is_some() {
                         binding(Binding::Unfocus)
                     } else {
                         None
                     }
                 }
-                mouse::Event::ButtonReleased(mouse::Button::Left) => Some(Update::Release),
+                mouse::Event::ButtonReleased(mouse::Button::Left) => Some(Update::ButtonRelease),
                 mouse::Event::CursorMoved { .. } => match state.drag_click {
                     Some(mouse::click::Kind::Single) => {
                         let cursor_position =
@@ -1315,7 +1331,7 @@ impl<Message> Update<Message> {
                 .map(Self::Binding)
             }
             Event::Keyboard(keyboard::Event::KeyReleased { .. }) if cfg!(target_os = "linux") => {
-                Some(Update::Release)
+                Some(Update::KeyRelease)
             }
             _ => None,
         }
