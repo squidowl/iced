@@ -1188,6 +1188,8 @@ pub enum Binding<Message> {
 pub struct KeyPress {
     /// The key pressed.
     pub key: keyboard::Key,
+    /// The physical key pressed.
+    pub physical_key: key::Physical,
     /// The state of the keyboard modifiers.
     pub modifiers: keyboard::Modifiers,
     /// The text produced by the key press.
@@ -1204,6 +1206,7 @@ impl<Message> Binding<Message> {
             modifiers,
             text,
             status,
+            ..
         } = event;
 
         if !matches!(status, Status::Focused { .. }) {
@@ -1385,6 +1388,7 @@ impl<Message> Update<Message> {
             },
             Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
+                physical_key,
                 modifiers,
                 text,
                 ..
@@ -1399,6 +1403,7 @@ impl<Message> Update<Message> {
 
                 let key_press = KeyPress {
                     key: key.clone(),
+                    physical_key: *physical_key,
                     modifiers: *modifiers,
                     text: text.clone(),
                     status,
