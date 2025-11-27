@@ -1132,7 +1132,7 @@ where
 
                     #[cfg(target_os = "macos")]
                     let key = crate::text_editor::convert_macos_shortcut(
-                        key, modifiers,
+                        key, *modifiers,
                     );
 
                     match key.as_ref() {
