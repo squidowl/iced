@@ -7,7 +7,8 @@ use crate::core::widget;
 use crate::core::widget::operation;
 use crate::core::widget::tree;
 use crate::core::{
-    self, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Vector, Widget,
+    self, Clipboard, Color, Element, Event, Layout, Length, Point, Rectangle, Shell, Size, Vector,
+    Widget,
 };
 use crate::test::Selector;
 use crate::test::instruction::{Interaction, Mouse, Target};
@@ -85,6 +86,7 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
@@ -121,6 +123,7 @@ where
             layout,
             cursor,
             renderer,
+            clipboard,
             shell,
             viewport,
         );
@@ -310,6 +313,7 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
     ) {
         if shell.is_event_captured() {
@@ -334,7 +338,7 @@ where
 
         self.raw
             .as_overlay_mut()
-            .update(event, layout, cursor, renderer, shell);
+            .update(event, layout, cursor, renderer, clipboard, shell);
     }
 
     fn mouse_interaction(

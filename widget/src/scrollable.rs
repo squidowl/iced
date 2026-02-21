@@ -35,8 +35,8 @@ use crate::core::widget::operation::{self, Operation};
 use crate::core::widget::tree::{self, Tree};
 use crate::core::window;
 use crate::core::{
-    self, Background, Color, Element, Event, InputMethod, Layout, Length, Padding, Pixels, Point,
-    Rectangle, Shadow, Shell, Size, Theme, Vector, Widget,
+    self, Background, Clipboard, Color, Element, Event, InputMethod, Layout, Length, Padding,
+    Pixels, Point, Rectangle, Shadow, Shell, Size, Theme, Vector, Widget,
 };
 
 pub use operation::scrollable::{AbsoluteOffset, RelativeOffset};
@@ -554,6 +554,7 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
@@ -754,6 +755,7 @@ where
                     content,
                     cursor,
                     renderer,
+                    clipboard,
                     shell,
                     &Rectangle {
                         y: bounds.y + translation.y,
