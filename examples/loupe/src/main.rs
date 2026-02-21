@@ -46,6 +46,7 @@ impl Loupe {
 }
 
 mod loupe {
+    use iced::advanced::Clipboard;
     use iced::advanced::Renderer as _;
     use iced::advanced::Shell;
     use iced::advanced::layout::{self, Layout};
@@ -109,6 +110,7 @@ mod loupe {
             layout: Layout<'_>,
             cursor: mouse::Cursor,
             _renderer: &Renderer,
+            _clipboard: &mut dyn Clipboard,
             shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) {

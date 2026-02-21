@@ -39,6 +39,7 @@ pub struct Emulator<P: Program> {
     size: Size,
     window: core::window::Id,
     cursor: mouse::Cursor,
+    clipboard: Clipboard,
     cache: Option<user_interface::Cache>,
     pending_tasks: usize,
 }
@@ -109,6 +110,7 @@ impl<P: Program + 'static> Emulator<P> {
             renderer,
             mode,
             size,
+            clipboard: Clipboard { content: None },
             cursor: mouse::Cursor::Unavailable,
             window: core::window::Id::unique(),
             cache: Some(user_interface::Cache::default()),
@@ -243,11 +245,7 @@ impl<P: Program + 'static> Emulator<P> {
                     // TODO
                     dbg!(action);
                 }
-                iced_runtime::Action::Event { window, event } => {
-                    // TODO
-                    dbg!(window, event);
-                }
-                runtime::Action::Tick => {
+                iced_runtime::Action::Tick => {
                     // TODO
                 }
                 runtime::Action::Exit => {
@@ -326,8 +324,13 @@ impl<P: Program + 'static> Emulator<P> {
                     }
                 }
 
-                let (_state, _status) =
-                    user_interface.update(&events, self.cursor, &mut self.renderer, &mut messages);
+                let (_state, _status) = user_interface.update(
+                    &events,
+                    self.cursor,
+                    &mut self.renderer,
+                    &mut self.clipboard,
+                    &mut messages,
+                );
 
                 self.cache = Some(user_interface.into_cache());
 
@@ -455,6 +458,7 @@ impl<P: Program + 'static> Emulator<P> {
             ))],
             mouse::Cursor::Unavailable,
             &mut self.renderer,
+            &mut self.clipboard,
             &mut Vec::new(),
         );
 
@@ -519,5 +523,19 @@ impl fmt::Display for Mode {
             Self::Patient => "Patient",
             Self::Immediate => "Immediate",
         })
+    }
+}
+
+struct Clipboard {
+    content: Option<String>,
+}
+
+impl core::Clipboard for Clipboard {
+    fn read(&self, _kind: core::clipboard::Kind) -> Option<String> {
+        self.content.clone()
+    }
+
+    fn write(&mut self, _kind: core::clipboard::Kind, contents: String) {
+        self.content = Some(contents);
     }
 }

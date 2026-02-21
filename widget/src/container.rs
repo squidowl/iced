@@ -30,8 +30,8 @@ use crate::core::theme;
 use crate::core::widget::tree::{self, Tree};
 use crate::core::widget::{self, Operation};
 use crate::core::{
-    self, Background, Color, Element, Event, Layout, Length, Padding, Pixels, Rectangle, Shadow,
-    Shell, Size, Theme, Vector, Widget, color,
+    self, Background, Clipboard, Color, Element, Event, Layout, Length, Padding, Pixels, Rectangle,
+    Shadow, Shell, Size, Theme, Vector, Widget, color,
 };
 
 /// A widget that aligns its contents inside of its boundaries.
@@ -287,6 +287,7 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
@@ -296,6 +297,7 @@ where
             layout.children().next().unwrap(),
             cursor,
             renderer,
+            clipboard,
             shell,
             viewport,
         );
