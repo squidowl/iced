@@ -22,8 +22,8 @@ use crate::core::svg;
 use crate::core::widget::Tree;
 use crate::core::window;
 use crate::core::{
-    Color, ContentFit, Element, Event, Layout, Length, Point, Rectangle, Rotation, Shell, Size,
-    Theme, Vector, Widget,
+    Clipboard, Color, ContentFit, Element, Event, Layout, Length, Point, Rectangle, Rotation,
+    Shell, Size, Theme, Vector, Widget,
 };
 
 use std::path::PathBuf;
@@ -203,6 +203,7 @@ where
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
