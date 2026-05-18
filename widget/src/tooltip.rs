@@ -385,15 +385,31 @@ where
 /// The position of the tooltip. Defaults to following the cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Position {
-    /// The tooltip will appear on the top of the widget.
+    /// The tooltip will appear on the top of the widget, centered.
     #[default]
     Top,
-    /// The tooltip will appear on the bottom of the widget.
+    /// The tooltip will appear on the top of the widget, aligned on left.
+    TopLeft,
+    /// The tooltip will appear on the top of the widget, aligned on right.
+    TopRight,
+    /// The tooltip will appear on the bottom of the widget, centered.
     Bottom,
-    /// The tooltip will appear on the left of the widget.
+    /// The tooltip will appear on the bottom of the widget, aligned on left.
+    BottomLeft,
+    /// The tooltip will appear on the bottom of the widget, aligned on right.
+    BottomRight,
+    /// The tooltip will appear on the left of the widget, centered.
     Left,
-    /// The tooltip will appear on the right of the widget.
+    /// The tooltip will appear on the left of the widget, aligned on top.
+    LeftTop,
+    /// The tooltip will appear on the left of the widget, aligned on bottom.
+    LeftBottom,
+    /// The tooltip will appear on the right of the widget, centered.
     Right,
+    /// The tooltip will appear on the right of the widget, aligned on top.
+    RightTop,
+    /// The tooltip will appear on the right of the widget, aligned on bottom.
+    RightBottom,
     /// The tooltip will follow the cursor.
     FollowCursor,
 }
@@ -460,17 +476,53 @@ where
                     x_center,
                     self.position.y - text_bounds.height - self.gap - self.padding,
                 ),
+                Position::TopLeft => Vector::new(
+                    self.position.x + self.padding,
+                    self.position.y - text_bounds.height - self.gap - self.padding,
+                ),
+                Position::TopRight => Vector::new(
+                    self.position.x + self.content_bounds.width - text_bounds.width - self.padding,
+                    self.position.y - text_bounds.height - self.gap - self.padding,
+                ),
                 Position::Bottom => Vector::new(
                     x_center,
+                    self.position.y + self.content_bounds.height + self.gap + self.padding,
+                ),
+                Position::BottomLeft => Vector::new(
+                    self.position.x + self.padding,
+                    self.position.y + self.content_bounds.height + self.gap + self.padding,
+                ),
+                Position::BottomRight => Vector::new(
+                    self.position.x + self.content_bounds.width - text_bounds.width - self.padding,
                     self.position.y + self.content_bounds.height + self.gap + self.padding,
                 ),
                 Position::Left => Vector::new(
                     self.position.x - text_bounds.width - self.gap - self.padding,
                     y_center,
                 ),
+                Position::LeftTop => Vector::new(
+                    self.position.x - text_bounds.width - self.gap - self.padding,
+                    self.position.y + self.padding,
+                ),
+                Position::LeftBottom => Vector::new(
+                    self.position.x - text_bounds.width - self.gap - self.padding,
+                    self.position.y + self.content_bounds.height
+                        - text_bounds.height
+                        - self.padding,
+                ),
                 Position::Right => Vector::new(
                     self.position.x + self.content_bounds.width + self.gap + self.padding,
                     y_center,
+                ),
+                Position::RightTop => Vector::new(
+                    self.position.x + self.content_bounds.width + self.gap + self.padding,
+                    self.position.y + self.padding,
+                ),
+                Position::RightBottom => Vector::new(
+                    self.position.x + self.content_bounds.width + self.gap + self.padding,
+                    self.position.y + self.content_bounds.height
+                        - text_bounds.height
+                        - self.padding,
                 ),
                 Position::FollowCursor => {
                     let translation = self.position - self.content_bounds.position();

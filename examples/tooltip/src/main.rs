@@ -1,8 +1,8 @@
-use iced::Element;
 use iced::alignment;
 use iced::time::seconds;
 use iced::widget::tooltip::Position;
-use iced::widget::{button, center, checkbox, column, container, tooltip};
+use iced::widget::{button, center, checkbox, column, container, text, tooltip};
+use iced::Element;
 
 pub fn main() -> iced::Result {
     iced::run(Tooltip::update, Tooltip::view)
@@ -25,11 +25,19 @@ impl Tooltip {
         match message {
             Message::ChangePosition => {
                 let position = match &self.position {
-                    Position::Top => Position::Bottom,
-                    Position::Bottom => Position::Left,
-                    Position::Left => Position::Right,
-                    Position::Right => Position::FollowCursor,
-                    Position::FollowCursor => Position::Top,
+                    Position::Top => Position::TopRight,
+                    Position::TopRight => Position::RightTop,
+                    Position::RightTop => Position::Right,
+                    Position::Right => Position::RightBottom,
+                    Position::RightBottom => Position::BottomRight,
+                    Position::BottomRight => Position::Bottom,
+                    Position::Bottom => Position::BottomLeft,
+                    Position::BottomLeft => Position::LeftBottom,
+                    Position::LeftBottom => Position::Left,
+                    Position::Left => Position::LeftTop,
+                    Position::LeftTop => Position::FollowCursor,
+                    Position::FollowCursor => Position::TopLeft,
+                    Position::TopLeft => Position::Top,
                 };
 
                 self.position = position;
@@ -42,7 +50,8 @@ impl Tooltip {
 
     fn view(&self) -> Element<'_, Message> {
         let tooltip = tooltip(
-            button("Press to change position").on_press(Message::ChangePosition),
+            button(text("Press\nto\nchange position").align_x(alignment::Horizontal::Center))
+                .on_press(Message::ChangePosition),
             position_to_text(self.position),
             self.position,
         )
@@ -66,9 +75,17 @@ impl Tooltip {
 fn position_to_text<'a>(position: Position) -> &'a str {
     match position {
         Position::FollowCursor => "Follow Cursor",
+        Position::TopLeft => "Top Left",
         Position::Top => "Top",
-        Position::Bottom => "Bottom",
-        Position::Left => "Left",
+        Position::TopRight => "Top Right",
+        Position::RightTop => "Right Top",
         Position::Right => "Right",
+        Position::RightBottom => "Right Bottom",
+        Position::BottomLeft => "Bottom Left",
+        Position::Bottom => "Bottom",
+        Position::BottomRight => "Bottom Right",
+        Position::LeftTop => "Left Top",
+        Position::Left => "Left",
+        Position::LeftBottom => "Left Bottom",
     }
 }
