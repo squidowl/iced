@@ -358,15 +358,43 @@ where
                     Position::Top => {
                         Point::new(x_center, position.y - tooltip_size.height - self.gap)
                     }
+                    Position::TopLeft => {
+                        Point::new(position.x, position.y - tooltip_size.height - self.gap)
+                    }
+                    Position::TopRight => Point::new(
+                        position.x + content_bounds.width - tooltip_size.width,
+                        position.y - tooltip_size.height - self.gap,
+                    ),
                     Position::Bottom => {
                         Point::new(x_center, position.y + content_bounds.height + self.gap)
                     }
+                    Position::BottomLeft => {
+                        Point::new(position.x, position.y + content_bounds.height + self.gap)
+                    }
+                    Position::BottomRight => Point::new(
+                        position.x + content_bounds.width - tooltip_size.width,
+                        position.y + content_bounds.height + self.gap,
+                    ),
                     Position::Left => {
                         Point::new(position.x - tooltip_size.width - self.gap, y_center)
                     }
+                    Position::LeftTop => {
+                        Point::new(position.x - tooltip_size.width - self.gap, position.y)
+                    }
+                    Position::LeftBottom => Point::new(
+                        position.x - tooltip_size.width - self.gap,
+                        position.y + content_bounds.height - tooltip_size.height,
+                    ),
                     Position::Right => {
                         Point::new(position.x + content_bounds.width + self.gap, y_center)
                     }
+                    Position::RightTop => {
+                        Point::new(position.x + content_bounds.width + self.gap, position.y)
+                    }
+                    Position::RightBottom => Point::new(
+                        position.x + content_bounds.width + self.gap,
+                        position.y + content_bounds.height - tooltip_size.height,
+                    ),
                     Position::FollowCursor => {
                         let translation = position - content_bounds.position();
 
@@ -444,15 +472,31 @@ where
 /// The position of the tooltip. Defaults to following the cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Position {
-    /// The tooltip will appear on the top of the widget.
+    /// The tooltip will appear on the top of the widget, centered.
     #[default]
     Top,
-    /// The tooltip will appear on the bottom of the widget.
+    /// The tooltip will appear on the top of the widget, aligned on the left.
+    TopLeft,
+    /// The tooltip will appear on the top of the widget, aligned on the right.
+    TopRight,
+    /// The tooltip will appear on the bottom of the widget, centered.
     Bottom,
-    /// The tooltip will appear on the left of the widget.
+    /// The tooltip will appear on the bottom of the widget, aligned on the left.
+    BottomLeft,
+    /// The tooltip will appear on the bottom of the widget, aligned on the right.
+    BottomRight,
+    /// The tooltip will appear on the left of the widget, centered.
     Left,
-    /// The tooltip will appear on the right of the widget.
+    /// The tooltip will appear on the left of the widget, aligned on the top.
+    LeftTop,
+    /// The tooltip will appear on the left of the widget, aligned on the bottom.
+    LeftBottom,
+    /// The tooltip will appear on the right of the widget, centered.
     Right,
+    /// The tooltip will appear on the right of the widget, aligned on the top.
+    RightTop,
+    /// The tooltip will appear on the right of the widget, aligned on the bottom.
+    RightBottom,
     /// The tooltip will follow the cursor.
     FollowCursor,
 }
