@@ -68,6 +68,7 @@ where
     position: Position,
     gap: f32,
     snap_within_viewport: bool,
+    smart_placement: bool,
     delay: Duration,
     class: Theme::Class<'a>,
 }
@@ -91,6 +92,7 @@ where
             position,
             gap: 0.0,
             snap_within_viewport: true,
+            smart_placement: false,
             delay: Duration::ZERO,
             class: Theme::default(),
         }
@@ -113,6 +115,16 @@ where
     /// Sets whether the [`Tooltip`] is snapped within the viewport.
     pub fn snap_within_viewport(mut self, snap: bool) -> Self {
         self.snap_within_viewport = snap;
+        self
+    }
+
+    /// Sets whether the [`Tooltip`] will move to the opposite side of its
+    /// content when there is insufficient space in the specified position.
+    ///
+    /// The tooltip stays on the same axis. If neither side has enough space,
+    /// it is snapped within the viewport as usual.
+    pub fn smart_placement(mut self, smart_placement: bool) -> Self {
+        self.smart_placement = smart_placement;
         self
     }
 
@@ -408,15 +420,67 @@ where
 
             if self.snap_within_viewport {
                 if tooltip_bounds.x < viewport.x {
-                    tooltip_bounds.x = viewport.x;
+                    if self.smart_placement
+                        && matches!(
+                            self.position,
+                            Position::LeftTop | Position::Left | Position::LeftBottom
+                        )
+                    {
+                        tooltip_bounds.x = position.x + content_bounds.width + self.gap;
+
+                        if viewport.x + viewport.width < tooltip_bounds.x + tooltip_bounds.width {
+                            tooltip_bounds.x = viewport.x;
+                        }
+                    } else {
+                        tooltip_bounds.x = viewport.x;
+                    }
                 } else if viewport.x + viewport.width < tooltip_bounds.x + tooltip_bounds.width {
-                    tooltip_bounds.x = viewport.x + viewport.width - tooltip_bounds.width;
+                    if self.smart_placement
+                        && matches!(
+                            self.position,
+                            Position::RightTop | Position::Right | Position::RightBottom
+                        )
+                    {
+                        tooltip_bounds.x = position.x - tooltip_size.width - self.gap;
+
+                        if tooltip_bounds.x < viewport.x {
+                            tooltip_bounds.x = viewport.x + viewport.width - tooltip_bounds.width;
+                        }
+                    } else {
+                        tooltip_bounds.x = viewport.x + viewport.width - tooltip_bounds.width;
+                    }
                 }
 
                 if tooltip_bounds.y < viewport.y {
-                    tooltip_bounds.y = viewport.y;
+                    if self.smart_placement
+                        && matches!(
+                            self.position,
+                            Position::TopLeft | Position::Top | Position::TopRight
+                        )
+                    {
+                        tooltip_bounds.y = position.y + content_bounds.height + self.gap;
+
+                        if viewport.y + viewport.height < tooltip_bounds.y + tooltip_bounds.height {
+                            tooltip_bounds.y = viewport.y;
+                        }
+                    } else {
+                        tooltip_bounds.y = viewport.y;
+                    }
                 } else if viewport.y + viewport.height < tooltip_bounds.y + tooltip_bounds.height {
-                    tooltip_bounds.y = viewport.y + viewport.height - tooltip_bounds.height;
+                    if self.smart_placement
+                        && matches!(
+                            self.position,
+                            Position::BottomLeft | Position::Bottom | Position::BottomRight
+                        )
+                    {
+                        tooltip_bounds.y = position.y - tooltip_size.height - self.gap;
+
+                        if tooltip_bounds.y < viewport.y {
+                            tooltip_bounds.y = viewport.y + viewport.height - tooltip_bounds.height;
+                        }
+                    } else {
+                        tooltip_bounds.y = viewport.y + viewport.height - tooltip_bounds.height;
+                    }
                 }
             }
 
