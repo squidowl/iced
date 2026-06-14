@@ -853,6 +853,7 @@ where
 
                 if cfg!(target_os = "linux")
                     && let Some((start, end)) = state.cursor.selection(&self.value)
+                    && start != end
                 {
                     shell.write_clipboard_primary(clipboard::Content::Text(
                         self.value.select(start, end).to_string(),
@@ -1171,6 +1172,7 @@ where
 
                                 if cfg!(target_os = "linux")
                                     && let Some((start, end)) = state.cursor.selection(&self.value)
+                                    && start != end
                                 {
                                     shell.write_clipboard_primary(clipboard::Content::Text(
                                         self.value.select(start, end).to_string(),
@@ -1211,6 +1213,7 @@ where
 
                                 if cfg!(target_os = "linux")
                                     && let Some((start, end)) = state.cursor.selection(&self.value)
+                                    && start != end
                                 {
                                     shell.write_clipboard_primary(clipboard::Content::Text(
                                         self.value.select(start, end).to_string(),
