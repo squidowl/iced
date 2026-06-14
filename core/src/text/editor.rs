@@ -440,8 +440,12 @@ impl State {
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.is_dragging = false;
 
-                    if cfg!(target_os = "linux") && self.focus.is_some() {
-                        Some(Update::CopyPrimary(editor.copy()?))
+                    if cfg!(target_os = "linux")
+                        && self.focus.is_some()
+                        && let Some(copy) = editor.copy()
+                        && !copy.is_empty()
+                    {
+                        Some(Update::CopyPrimary(copy))
                     } else {
                         Some(Update::Release)
                     }
