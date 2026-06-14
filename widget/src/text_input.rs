@@ -1794,7 +1794,7 @@ fn update_primary_clipboard(
     value: &Value,
     cursor: Cursor,
 ) {
-    if let Some((start, end)) = cursor.selection(value) {
+    if let Some((start, end)) = cursor.selection(value) && start != end {
         clipboard.write(
             clipboard::Kind::Primary,
             value.select(start, end).to_string(),

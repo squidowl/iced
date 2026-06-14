@@ -751,18 +751,12 @@ where
                     state.drag_click = None;
 
                     if cfg!(target_os = "linux") && state.focus.is_some() {
-                        clipboard.write(
-                            clipboard::Kind::Primary,
-                            self.content.selection().unwrap_or_default(),
-                        );
+                        update_primary_clipboard(clipboard, self.content.selection());
                     }
                 }
                 Update::KeyRelease => {
                     if cfg!(target_os = "linux") && state.focus.is_some() {
-                        clipboard.write(
-                            clipboard::Kind::Primary,
-                            self.content.selection().unwrap_or_default(),
-                        );
+                        update_primary_clipboard(clipboard, self.content.selection());
                     }
                 }
                 Update::Scroll(lines) => {
@@ -1500,4 +1494,16 @@ pub(crate) fn convert_macos_shortcut(
     };
 
     Some(keyboard::Key::Named(key))
+}
+
+fn update_primary_clipboard(
+    clipboard: &mut dyn Clipboard,
+    selection: Option<String>,
+) {
+    if let Some(selection) = selection && !selection.is_empty() {
+        clipboard.write(
+            clipboard::Kind::Primary,
+            selection,
+        );
+    }
 }
