@@ -145,6 +145,25 @@ impl Cache {
                     tiny_skia::Transform::default()
                 };
 
+                // This is not the hard limit, it is just being utilized as a
+                // convenient reference for when an image is "too large".
+                let max_buffer_size = wgpu::Limits::downlevel_defaults().max_buffer_size;
+
+                for filter in tree.filters() {
+                    let filter_size = filter
+                        .rect()
+                        .transform(transform)
+                        .map(|rect| rect.to_int_rect())
+                        .map(|rect| u64::from(rect.width()) * u64::from(rect.height()))?;
+
+                    // Always 4 bytes per pixel (RGBA)
+                    let filter_bytes = 4 * filter_size;
+
+                    if filter_bytes > max_buffer_size {
+                        return None;
+                    }
+                }
+
                 // SVG rendering can panic on malformed or complex vectors.
                 // We catch panics to prevent crashes and continue gracefully.
                 let render = panic::catch_unwind(panic::AssertUnwindSafe(|| {
