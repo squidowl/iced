@@ -902,17 +902,20 @@ fn shape_until_cursor(
 
     if let Some((x, _)) = editor.cursor_position() {
         let buffer = buffer_mut_from_editor(editor);
-        let scroll = buffer.scroll();
-        let (width, _) = buffer.size();
 
-        const CURSOR_WIDTH: f32 = 2.0; // TODO: Configurable!
+        // Only adjust the scroll position if the width has been set.
+        if let (Some(width), _) = buffer.size() {
+            let scroll = buffer.scroll();
 
-        buffer.set_scroll(cosmic_text::Scroll {
-            horizontal: scroll.horizontal
-                + (x as f32 + CURSOR_WIDTH - scroll.horizontal - width.unwrap_or_default())
-                    .clamp(0.0, CURSOR_WIDTH),
-            ..scroll
-        });
+            const CURSOR_WIDTH: f32 = 2.0; // TODO: Configurable!
+
+            buffer.set_scroll(cosmic_text::Scroll {
+                horizontal: scroll.horizontal
+                    + (x as f32 + CURSOR_WIDTH - scroll.horizontal - width)
+                        .clamp(0.0, CURSOR_WIDTH),
+                ..scroll
+            });
+        }
     }
 }
 
