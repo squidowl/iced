@@ -161,6 +161,10 @@ impl<R: text::Renderer> Input<R> {
                             })),
                             true,
                         ),
+                        editor::Action::MiddleClick(_) => {
+                            shell.read_clipboard_primary(clipboard::Kind::Text);
+                            (action, false)
+                        }
                         _ => (action, false),
                     };
 
@@ -189,6 +193,10 @@ impl<R: text::Renderer> Input<R> {
                 editor::Update::Release => {}
                 editor::Update::Copy(text) => {
                     shell.write_clipboard(text);
+                    shell.capture_event();
+                }
+                editor::Update::CopyPrimary(text) => {
+                    shell.write_clipboard_primary(text);
                     shell.capture_event();
                 }
                 editor::Update::Paste => {

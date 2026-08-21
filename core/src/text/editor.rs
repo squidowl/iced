@@ -136,6 +136,8 @@ pub enum Action {
     Edit(Edit),
     /// Click the [`Editor`] at the given [`Point`].
     Click(Point, mouse::click::Kind),
+    /// Middle-click the [`Editor`] at the given [`Point`].
+    MiddleClick(Point),
     /// Drag the mouse on the [`Editor`] to the given [`Point`].
     Drag(Point),
     /// Scroll the [`Editor`] a certain amount of lines.
@@ -412,10 +414,37 @@ impl State {
                         None
                     }
                 }
+                mouse::Event::ButtonPressed(mouse::Button::Middle) => {
+                    if let Some(cursor_position) = cursor.position_in(bounds) {
+                        let cursor_position =
+                            cursor_position - Vector::new(padding.left, padding.top);
+
+                        let click = mouse::Click::new(
+                            cursor_position,
+                            mouse::Button::Middle,
+                            self.last_click,
+                        );
+
+                        self.focus = Some(Focus::now());
+                        self.last_click = Some(click);
+
+                        Some(Update::Action(Action::MiddleClick(click.position())))
+                    } else if self.focus.is_some() {
+                        self.focus = None;
+
+                        Some(Update::Unfocus)
+                    } else {
+                        None
+                    }
+                }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.is_dragging = false;
 
-                    Some(Update::Release)
+                    if cfg!(target_os = "linux") && self.focus.is_some() {
+                        Some(Update::CopyPrimary(editor.copy()?))
+                    } else {
+                        Some(Update::Release)
+                    }
                 }
                 mouse::Event::CursorMoved { .. } if self.is_dragging => {
                     let position = cursor.position_from(bounds.position())?
@@ -947,6 +976,8 @@ pub enum Update<Message> {
     Release,
     /// The [`Editor`] must copy some text to the clipboard.
     Copy(String),
+    /// The [`Editor`] must copy some text to the primary clipboard.
+    CopyPrimary(String),
     /// The [`Editor`] must paste the clipboard contents.
     Paste,
     /// The [`Editor`] must be redrawn at the given [`Instant`].
