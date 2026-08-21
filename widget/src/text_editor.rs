@@ -409,6 +409,9 @@ where
         ) {
             match update {
                 editor::Update::Action(action) => {
+                    if matches!(action, editor::Action::MiddleClick(_)) {
+                        shell.read_clipboard_primary(clipboard::Kind::Text);
+                    }
                     shell.publish(on_edit(action));
                 }
                 editor::Update::Release => {}
@@ -422,6 +425,9 @@ where
                 }
                 editor::Update::Copy(content) => {
                     shell.write_clipboard(clipboard::Content::Text(content));
+                }
+                editor::Update::CopyPrimary(content) => {
+                    shell.write_clipboard_primary(clipboard::Content::Text(content));
                 }
                 editor::Update::Paste => {
                     shell.read_clipboard(clipboard::Kind::Text);
