@@ -562,6 +562,16 @@ impl editor::Editor for Editor {
 
                     shape_until_cursor(editor, &mut font_system.raw);
                 }
+                Action::MiddleClick(position) => {
+                    let scroll = buffer_from_editor(editor).scroll();
+
+                    let x = ((position.x + scroll.horizontal) * internal.hint_factor) as i32;
+                    let y = (position.y * internal.hint_factor) as i32;
+
+                    editor.action(font_system.raw(), cosmic_text::Action::Click { x, y });
+
+                    shape_until_cursor(editor, &mut font_system.raw);
+                }
                 Action::Drag(position) => {
                     let scroll = buffer_from_editor(editor).scroll();
 
