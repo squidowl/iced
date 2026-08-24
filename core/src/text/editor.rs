@@ -389,7 +389,7 @@ impl State {
             Event::Mouse(event) => match event {
                 mouse::Event::ButtonPressed {
                     button: mouse::Button::Left,
-                    ..
+                    modifiers,
                 } => {
                     if let Some(cursor_position) = cursor.position_in(bounds) {
                         let cursor_position =
@@ -405,10 +405,14 @@ impl State {
                         self.last_click = Some(click);
                         self.is_dragging = true;
 
-                        Some(Update::Action(Action::Click(
-                            click.position(),
-                            click.kind(),
-                        )))
+                        if modifiers.shift() && click.kind() == mouse::click::Kind::Single {
+                            Some(Update::Action(Action::Drag(click.position())))
+                        } else {
+                            Some(Update::Action(Action::Click(
+                                click.position(),
+                                click.kind(),
+                            )))
+                        }
                     } else if self.focus.is_some() {
                         self.focus = None;
 
@@ -635,6 +639,14 @@ impl State {
                 }
 
                 update
+            }
+            Event::Keyboard(keyboard::Event::KeyReleased { .. })
+                if cfg!(target_os = "linux")
+                    && self.focus.is_some()
+                    && let Some(copy) = editor.copy()
+                    && !copy.is_empty() =>
+            {
+                Some(Update::CopyPrimary(copy))
             }
             _ => None,
         }
