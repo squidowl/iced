@@ -55,6 +55,12 @@ impl Code {
         highlighter::Style {
             color,
             style: (self == Code::Comment).then_some(font::Style::Italic),
+            underline: None,
+            underline_color: None,
+            strikethrough: false,
+            strikethrough_color: None,
+            overline: false,
+            overline_color: None,
         }
     }
 }

@@ -851,11 +851,36 @@ impl editor::Editor for Editor {
             for (range, output) in parser.parse_line(line.text()) {
                 let format = highlight(output);
 
-                if format.color.is_some() || format.style.is_some() {
+                if format.needs_processing() {
                     list.add_span(
                         range,
                         &cosmic_text::Attrs {
                             color_opt: format.color.map(text::to_color),
+                            text_decoration: cosmic_text::TextDecoration {
+                                underline: match format.underline {
+                                    Some(highlighter::Underline::Single) => {
+                                        cosmic_text::UnderlineStyle::Single
+                                    }
+                                    Some(highlighter::Underline::Double) => {
+                                        cosmic_text::UnderlineStyle::Double
+                                    }
+                                    None => cosmic_text::UnderlineStyle::None,
+                                },
+                                underline_color_opt: format
+                                    .underline_color
+                                    .or(format.color)
+                                    .map(text::to_color),
+                                strikethrough: format.strikethrough,
+                                strikethrough_color_opt: format
+                                    .strikethrough_color
+                                    .or(format.color)
+                                    .map(text::to_color),
+                                overline: format.overline,
+                                overline_color_opt: format
+                                    .overline_color
+                                    .or(format.color)
+                                    .map(text::to_color),
+                            },
                             ..if let Some(style) = format.style {
                                 cosmic_text::Attrs {
                                     style: text::to_style(style),

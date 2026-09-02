@@ -19,6 +19,18 @@ pub struct Style {
     pub color: Option<Color>,
     /// The [`font::Style`] of the text.
     pub style: Option<font::Style>,
+    /// The underline decoration of the text.
+    pub underline: Option<Underline>,
+    /// The [`Color`] of the underline.
+    pub underline_color: Option<Color>,
+    /// Whether the text is strikethrough.
+    pub strikethrough: bool,
+    /// The [`Color`] of the strikethrough.
+    pub strikethrough_color: Option<Color>,
+    /// Whether the text is overlined.
+    pub overline: bool,
+    /// The [`Color`] of the overline.
+    pub overline_color: Option<Color>,
 }
 
 impl<T, Input, Theme> Highlighter<Input, Theme> for T
@@ -32,4 +44,24 @@ where
     fn highlight(&self, input: Input, theme: &Theme) -> Style {
         (self)(input, theme)
     }
+}
+
+impl Style {
+    /// Returns whether the [`Format`] needs to be processed.
+    pub fn needs_processing(&self) -> bool {
+        self.color.is_some()
+            || self.style.is_some()
+            || self.underline.is_some()
+            || self.strikethrough
+            || self.overline
+    }
+}
+
+/// The underline decoration of text.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Underline {
+    /// A single underline.
+    Single,
+    /// A double underline.
+    Double,
 }
