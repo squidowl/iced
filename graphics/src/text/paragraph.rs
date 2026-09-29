@@ -1,7 +1,9 @@
 //! Draw paragraphs.
 use crate::core;
 use crate::core::alignment;
-use crate::core::text::{Alignment, Ellipsis, Hit, LineHeight, Shaping, Span, Text, Wrapping};
+use crate::core::text::{
+    Alignment, Ellipsis, Hit, LineHeight, Position, Shaping, Span, Text, Wrapping,
+};
 use crate::core::{Font, Pixels, Point, Rectangle, Size};
 use crate::text;
 
@@ -305,7 +307,10 @@ impl core::text::Paragraph for Paragraph {
             .buffer
             .hit(point.x * self.0.hint_factor, point.y * self.0.hint_factor)?;
 
-        Some(Hit::CharOffset(cursor.index))
+        Some(Hit::CharPosition(Position {
+            index: cursor.index,
+            line: cursor.line,
+        }))
     }
 
     fn hit_span(&self, point: Point) -> Option<usize> {

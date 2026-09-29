@@ -276,14 +276,14 @@ impl Hash for LineHeight {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Hit {
     /// The point was within the bounds of the returned character index.
-    CharOffset(usize),
+    CharPosition(Position),
 }
 
 impl Hit {
     /// Computes the cursor position of the [`Hit`] .
-    pub fn cursor(self) -> usize {
+    pub fn cursor(self) -> Position {
         match self {
-            Self::CharOffset(i) => i,
+            Self::CharPosition(p) => p,
         }
     }
 }
