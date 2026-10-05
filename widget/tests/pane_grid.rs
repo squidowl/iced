@@ -109,9 +109,10 @@ fn dragging_a_title_bar_publishes_picked_and_dropped_events() {
     );
     simulator.point_at(pick_position);
 
-    let _ = simulator.simulate([core::Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([core::Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     let messages: Vec<Message> = simulator.drain().collect();
     assert_eq!(
