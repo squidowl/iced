@@ -53,7 +53,16 @@ mod platform {
         /// Reads the current content of the [`Clipboard`] as text.
         pub fn read(
             &self,
+            #[cfg(all(
+                unix,
+                not(any(target_os = "macos", target_os = "android", target_os = "emscripten")),
+            ))]
             clipboard_kind: ClipboardKind,
+            #[cfg(not(all(
+                unix,
+                not(any(target_os = "macos", target_os = "android", target_os = "emscripten")),
+            )))]
+            _clipboard_kind: ClipboardKind,
             kind: Kind,
             callback: impl FnOnce(Result<Content, Error>) + Send + 'static,
         ) {
@@ -122,7 +131,16 @@ mod platform {
         /// Writes the given text contents to the [`Clipboard`].
         pub fn write(
             &mut self,
+            #[cfg(all(
+                unix,
+                not(any(target_os = "macos", target_os = "android", target_os = "emscripten")),
+            ))]
             clipboard_kind: ClipboardKind,
+            #[cfg(not(all(
+                unix,
+                not(any(target_os = "macos", target_os = "android", target_os = "emscripten")),
+            )))]
+            _clipboard_kind: ClipboardKind,
             content: Content,
             callback: impl FnOnce(Result<(), Error>) + Send + 'static,
         ) {
