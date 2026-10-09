@@ -1303,14 +1303,14 @@ impl Interaction {
         self.axis().is_some()
     }
 
-    /// The axis and the fraction of the scroller grabbed, if a scroller is
+    /// The axis and the last pointer coordinate along it, if a scroller is
     /// being dragged.
     fn scroller_grabbed(&self) -> Option<(Axis, f32)> {
-        let Interaction::ScrollerGrabbed(axis, grabbed_at) = self else {
+        let Interaction::ScrollerGrabbed(axis, pointer) = self else {
             return None;
         };
 
-        Some((*axis, *grabbed_at))
+        Some((*axis, *pointer))
     }
 }
 
@@ -2791,9 +2791,9 @@ impl State {
             interact.request_redraw = true;
         }
 
-        // A scroller being dragged follows the pointer 1:1, until the button
-        // is released
-        if let Some((axis, scroller_grabbed_at)) = self.interaction.scroller_grabbed() {
+        // A scroller being dragged follows the pointer's movement, until the
+        // button is released
+        if let Some((axis, pointer)) = self.interaction.scroller_grabbed() {
             match event {
                 Event::Mouse(mouse::Event::CursorMoved { .. })
                 | Event::Touch(touch::Event::FingerMoved { .. }) => {
@@ -2803,12 +2803,32 @@ impl State {
                             return interact;
                         };
 
-                        self.scroll_to_percentage(
-                            axis,
-                            scrollbar.scroll_percentage(axis, scroller_grabbed_at, cursor_position),
-                            bounds,
-                            content,
-                        );
+                        let position = axis.coordinate(cursor_position);
+                        let rail = scrollbar.scroller.map_or(0.0, |scroller| {
+                            axis.length(scrollbar.bounds) - axis.length(scroller.bounds)
+                        });
+                        let ratio = (axis.length(content) - axis.length(bounds)) / rail;
+
+                        if rail > 0.0 && ratio > 0.0 {
+                            let direction = match scrollbar.alignment {
+                                Anchor::Start => 1.0,
+                                Anchor::End => -1.0,
+                            };
+                            let before = self.axis_offset(axis, bounds, content);
+
+                            self.scroll(
+                                axis.vector((position - pointer) * ratio * direction),
+                                bounds,
+                                content,
+                            );
+
+                            let applied = (self.axis_offset(axis, bounds, content) - before)
+                                * direction
+                                / ratio;
+
+                            self.interaction =
+                                Interaction::ScrollerGrabbed(axis, pointer + applied);
+                        }
 
                         self.source = Some(Source::Scrollbar);
 
@@ -2848,7 +2868,10 @@ impl State {
                                     content,
                                 );
 
-                                self.interaction = Interaction::ScrollerGrabbed(axis, grabbed_at);
+                                self.interaction = Interaction::ScrollerGrabbed(
+                                    axis,
+                                    axis.coordinate(cursor_position),
+                                );
                             }
                             // A "jump click" on the rail — a `Shift`-click by
                             // default, or a plain click when `click_to_scroll`
@@ -2863,7 +2886,10 @@ impl State {
                                     content,
                                 );
 
-                                self.interaction = Interaction::ScrollerGrabbed(axis, 0.5);
+                                self.interaction = Interaction::ScrollerGrabbed(
+                                    axis,
+                                    axis.coordinate(cursor_position),
+                                );
                             }
                             // A paging rail press — a plain click by default,
                             // or a `Shift`-click when `click_to_scroll` is
