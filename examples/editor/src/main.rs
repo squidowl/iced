@@ -1,13 +1,17 @@
-use iced::keyboard;
+use iced::widget::text::highlighter::{Style, Underline};
 use iced::widget::{
     button, center_x, column, container, operation, pick_list, row, space, text, text_editor,
     toggler, tooltip,
 };
-use iced::window;
 use iced::{Center, Element, Fill, Font, Task, Theme, Window};
+use iced::{Color, window};
+use iced::{highlighter, keyboard};
 
+use std::collections::HashMap;
 use std::ffi;
 use std::io;
+use std::ops::Deref;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -19,6 +23,31 @@ pub fn main() -> iced::Result {
         .run()
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ErrorMap(Arc<HashMap<usize, Vec<Range<usize>>>>);
+
+impl ErrorMap {
+    pub fn new(map: HashMap<usize, Vec<Range<usize>>>) -> Self {
+        Self(Arc::new(map))
+    }
+}
+
+impl PartialEq for ErrorMap {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Deref for ErrorMap {
+    type Target = HashMap<usize, Vec<Range<usize>>>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 struct Editor {
     file: Option<PathBuf>,
     content: text_editor::Content,
@@ -26,6 +55,7 @@ struct Editor {
     word_wrap: bool,
     is_loading: bool,
     is_dirty: bool,
+    error_map: ErrorMap,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +80,7 @@ impl Editor {
                 word_wrap: true,
                 is_loading: true,
                 is_dirty: false,
+                error_map: ErrorMap::new(HashMap::from([(0, vec![0..16; 1])])),
             },
             Task::batch([
                 Task::perform(
@@ -84,6 +115,7 @@ impl Editor {
                 if !self.is_loading {
                     self.file = None;
                     self.content = text_editor::Content::new();
+                    self.error_map = ErrorMap::default();
                 }
 
                 Task::none()
@@ -196,12 +228,20 @@ impl Editor {
                 } else {
                     text::Wrapping::None
                 })
-                .highlight(
-                    self.file
-                        .as_deref()
-                        .and_then(Path::extension)
-                        .and_then(ffi::OsStr::to_str)
-                        .unwrap_or("rs"),
+                .highlight_with::<ConfigParser>(
+                    Settings {
+                        inner: highlighter::Settings {
+                            token: self
+                                .file
+                                .as_deref()
+                                .and_then(Path::extension)
+                                .and_then(ffi::OsStr::to_str)
+                                .unwrap_or("rs")
+                                .to_owned(),
+                        },
+                        error_map: self.error_map.clone(),
+                    },
+                    config_highlight,
                 )
                 .key_binding(|key_press| {
                     match key_press.key.as_ref() {
@@ -220,6 +260,123 @@ impl Editor {
 
     fn theme(&self) -> Theme {
         self.theme.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Settings {
+    inner: highlighter::Settings,
+    error_map: ErrorMap,
+}
+
+enum Code {
+    Syntax(iced::Code),
+    Error(iced::Code),
+}
+
+// iced toml parser, with the config error lines.
+struct ConfigParser {
+    inner: highlighter::Parser,
+    error_map: ErrorMap,
+}
+
+type ConfigCodeIterator<'a> = Box<dyn Iterator<Item = (Range<usize>, Code)> + 'a>;
+
+impl ConfigParser {
+    fn new(settings: &Settings) -> Self {
+        Self {
+            inner: highlighter::Parser::new(&settings.inner),
+            error_map: settings.error_map.clone(),
+        }
+    }
+
+    fn update(&mut self, settings: &Settings) {
+        self.inner.update(&settings.inner);
+        if self.error_map != settings.error_map {
+            self.error_map = settings.error_map.clone();
+        }
+    }
+
+    fn change_line(&mut self, line: usize) {
+        self.inner.change_line(line);
+    }
+
+    fn parse_line(&mut self, line: &str) -> ConfigCodeIterator<'_> {
+        let current_line = self.inner.current_line();
+        let spans = self.inner.parse_line(line);
+
+        let Some(errors) = self.error_map.get(&current_line) else {
+            return Box::new(spans.map(|(range, code)| (range, Code::Syntax(code))));
+        };
+
+        let mut result = Vec::new();
+        let mut err_idx = 0;
+
+        for (range, code) in spans {
+            let mut cursor = range.start;
+
+            while cursor < range.end {
+                while err_idx < errors.len() && errors[err_idx].end <= cursor {
+                    err_idx += 1;
+                }
+
+                let (end, code) = match errors.get(err_idx) {
+                    Some(err) if err.start <= cursor => (err.end.min(range.end), Code::Error(code)),
+                    Some(err) => (err.start.min(range.end), Code::Syntax(code)),
+                    None => (range.end, Code::Syntax(code)),
+                };
+
+                result.push((cursor..end, code));
+                cursor = end;
+            }
+        }
+
+        Box::new(result.into_iter())
+    }
+
+    fn current_line(&self) -> usize {
+        self.inner.current_line()
+    }
+}
+
+impl text::Parser for ConfigParser {
+    type Settings = Settings;
+    type Output = Code;
+    type Iterator<'a> = ConfigCodeIterator<'a>;
+
+    fn new(settings: &Self::Settings) -> Self {
+        Self::new(settings)
+    }
+
+    fn update(&mut self, new_settings: &Self::Settings) {
+        self.update(new_settings);
+    }
+
+    fn change_line(&mut self, line: usize) {
+        self.change_line(line);
+    }
+
+    fn parse_line(&mut self, line: &str) -> Self::Iterator<'_> {
+        self.parse_line(line)
+    }
+
+    fn current_line(&self) -> usize {
+        self.current_line()
+    }
+}
+
+fn config_highlight(output: Code, theme: &Theme) -> Style {
+    match output {
+        Code::Syntax(code) => code.highlight(theme),
+        Code::Error(code) => Style {
+            underline: Some(Underline::Single),
+            underline_color: Some(Color::from_rgb(1.0, 0.0, 0.0)),
+            strikethrough: true,
+            strikethrough_color: Some(Color::from_rgb(0.0, 1.0, 0.0)),
+            overline: true,
+            overline_color: Some(Color::from_rgb(0.0, 0.0, 1.0)),
+            ..code.highlight(theme)
+        },
     }
 }
 
