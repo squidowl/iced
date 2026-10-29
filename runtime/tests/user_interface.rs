@@ -91,7 +91,10 @@ impl<'a> overlay::Overlay<(), core::Theme, Renderer> for HidingOverlay<'a> {
         _renderer: &Renderer,
         shell: &mut Shell<'_, ()>,
     ) {
-        if matches!(event, Event::Mouse(core::mouse::Event::ButtonPressed(_))) {
+        if matches!(
+            event,
+            Event::Mouse(core::mouse::Event::ButtonPressed { .. })
+        ) {
             *self.overlay_visible = false;
             shell.invalidate_layout();
         }
@@ -114,7 +117,10 @@ fn events_after_an_overlay_disappears_reach_the_base_widget() {
     let mut messages = shell::Bus::new();
 
     let events = [
-        Event::Mouse(core::mouse::Event::ButtonPressed(core::mouse::Button::Left)),
+        Event::Mouse(core::mouse::Event::ButtonPressed {
+            button: core::mouse::Button::Left,
+            modifiers: core::keyboard::Modifiers::NONE,
+        }),
         Event::Mouse(core::mouse::Event::ButtonReleased(
             core::mouse::Button::Left,
         )),
@@ -215,8 +221,10 @@ impl overlay::Overlay<OverlayMessage, core::Theme, Renderer> for TopOverlay {
         _renderer: &Renderer,
         shell: &mut Shell<'_, OverlayMessage>,
     ) {
-        if matches!(event, Event::Mouse(core::mouse::Event::ButtonPressed(_)))
-            && cursor.position_over(Self::BOUNDS).is_some()
+        if matches!(
+            event,
+            Event::Mouse(core::mouse::Event::ButtonPressed { .. })
+        ) && cursor.position_over(Self::BOUNDS).is_some()
         {
             shell.publish(OverlayMessage::Top);
             shell.capture_event();
@@ -253,8 +261,10 @@ impl overlay::Overlay<OverlayMessage, core::Theme, Renderer> for BottomOverlay {
         _renderer: &Renderer,
         shell: &mut Shell<'_, OverlayMessage>,
     ) {
-        if matches!(event, Event::Mouse(core::mouse::Event::ButtonPressed(_)))
-            && cursor.position_over(Self::BOUNDS).is_some()
+        if matches!(
+            event,
+            Event::Mouse(core::mouse::Event::ButtonPressed { .. })
+        ) && cursor.position_over(Self::BOUNDS).is_some()
         {
             shell.publish(OverlayMessage::Bottom);
             shell.capture_event();
@@ -297,8 +307,10 @@ impl overlay::Overlay<OverlayMessage, core::Theme, Renderer> for NestedOverlay {
         _renderer: &Renderer,
         shell: &mut Shell<'_, OverlayMessage>,
     ) {
-        if matches!(event, Event::Mouse(core::mouse::Event::ButtonPressed(_)))
-            && cursor.position_over(Self::BOUNDS).is_some()
+        if matches!(
+            event,
+            Event::Mouse(core::mouse::Event::ButtonPressed { .. })
+        ) && cursor.position_over(Self::BOUNDS).is_some()
         {
             shell.publish(OverlayMessage::Nested);
             shell.capture_event();
@@ -318,9 +330,10 @@ fn multiple_overlays_are_handled_by_index_order_and_nested_overlays_capture_even
     );
 
     let mut messages = shell::Bus::new();
-    let events = [Event::Mouse(core::mouse::Event::ButtonPressed(
-        core::mouse::Button::Left,
-    ))];
+    let events = [Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })];
 
     // The nested overlay (index 0.9) captures events over `(0..20, 0..20)`
     let (_state, statuses) = user_interface.update(

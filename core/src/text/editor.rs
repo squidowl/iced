@@ -641,12 +641,11 @@ impl State {
                 update
             }
             Event::Keyboard(keyboard::Event::KeyReleased { .. })
-                if cfg!(target_os = "linux")
-                    && self.focus.is_some()
-                    && let Some(copy) = editor.copy()
-                    && !copy.is_empty() =>
+                if cfg!(target_os = "linux") && self.focus.is_some() =>
             {
-                Some(Update::CopyPrimary(copy))
+                editor
+                    .copy()
+                    .and_then(|copy| (!copy.is_empty()).then_some(Update::CopyPrimary(copy)))
             }
             _ => None,
         }

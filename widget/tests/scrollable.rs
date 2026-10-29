@@ -1155,9 +1155,10 @@ fn scrollbar_drag_unsnaps_only_the_dragged_axis() {
     // The scroller sits at the top of the track at the current offset, so
     // grab it there
     simulator.point_at(Point::new(1019.0, 6.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     simulator.point_at(Point::new(1019.0, 150.0));
     let _ = simulator.simulate([Event::Mouse(mouse::Event::CursorMoved {
@@ -1308,9 +1309,10 @@ fn notifications_report_the_scrollbar_source() {
     // The scroller sits at the top of the track at the current offset, so
     // grab it there
     simulator.point_at(Point::new(1019.0, 6.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     simulator.point_at(Point::new(1019.0, 100.0));
     let _ = simulator.simulate([Event::Mouse(mouse::Event::CursorMoved {
@@ -1355,9 +1357,10 @@ fn notifications_report_the_auto_scroll_source() {
     // Press the middle button over the content, then move the cursor below
     // the scrollable to auto-scroll down
     simulator.point_at(Point::new(500.0, 100.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Middle,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Middle,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     simulator.point_at(Point::new(500.0, 400.0));
     let _ = simulator.simulate([Event::Mouse(mouse::Event::CursorMoved {
@@ -1516,9 +1519,10 @@ fn rail_click_scrolls_a_page_smoothly() {
 
     simulator.point_at(Point::new(1019.0, 60.0));
 
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
     let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonReleased(
         mouse::Button::Left,
     ))]);
@@ -1579,9 +1583,10 @@ fn rail_click_is_immediate_when_smooth_scroll_disabled() {
 
     simulator.point_at(Point::new(1019.0, 60.0));
 
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
     let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonReleased(
         mouse::Button::Left,
     ))]);
@@ -1614,9 +1619,10 @@ fn rail_hold_autoscrolls_to_pointer() {
     step_frames(&mut simulator, &mut instant, 1);
 
     simulator.point_at(Point::new(1019.0, 60.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // Hold the button down: past the 250 ms press delay the autoscroll
     // slides the scroller toward the pointer and stops with its bottom edge
@@ -1656,9 +1662,10 @@ fn rail_hold_follows_pointer_movement() {
     step_frames(&mut simulator, &mut instant, 1);
 
     simulator.point_at(Point::new(1019.0, 60.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // Hold until the autoscroll settles at the first stop (scroller at y = 60,
     // offset 700)
@@ -1708,9 +1715,10 @@ fn rail_hold_autoscrolls_to_pointer_with_end_anchor() {
     step_frames(&mut simulator, &mut instant, 1);
 
     simulator.point_at(Point::new(1019.0, 60.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // Holding slides the scroller up toward the pointer; it stops with its
     // top edge at y = 60, i.e. at offset 1900
@@ -1752,9 +1760,10 @@ fn rail_hold_autoscrolls_to_pointer_on_horizontal_rail() {
     // the scroller spans x ∈ [0, 349.5), so x = 768 is on the rail, to the
     // right of it
     simulator.point_at(Point::new(768.0, 195.0));
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // Holding slides the scroller right toward the pointer; it stops with
     // its right edge at x = 768, i.e. at offset 1226
@@ -1798,9 +1807,10 @@ fn shift_rail_click_jumps_to_pointer() {
     let _ = simulator.simulate([Event::Keyboard(keyboard::Event::ModifiersChanged(
         Modifiers::SHIFT,
     ))]);
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // The jump is immediate: no further frames are needed, the scroller is
     // centered on the pointer (offset 800), with no in-flight animation
@@ -1834,9 +1844,10 @@ fn click_to_scroll_rail_click_jumps_to_pointer() {
 
     simulator.point_at(Point::new(1019.0, 60.0));
 
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
 
     // The jump is immediate: no further frames are needed, the scroller is
     // centered on the pointer (offset 800), with no in-flight animation
@@ -1873,9 +1884,10 @@ fn click_to_scroll_shift_rail_click_pages() {
     let _ = simulator.simulate([Event::Keyboard(keyboard::Event::ModifiersChanged(
         Modifiers::SHIFT,
     ))]);
-    let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonPressed(
-        mouse::Button::Left,
-    ))]);
+    let _ = simulator.simulate([Event::Mouse(core::mouse::Event::ButtonPressed {
+        button: core::mouse::Button::Left,
+        modifiers: core::keyboard::Modifiers::NONE,
+    })]);
     let _ = simulator.simulate([Event::Mouse(mouse::Event::ButtonReleased(
         mouse::Button::Left,
     ))]);
