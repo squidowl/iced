@@ -24,6 +24,7 @@ pub use iced_runtime as runtime;
 pub use program::core;
 pub use program::graphics;
 pub use runtime::futures;
+use url::Url;
 pub use winit;
 
 pub mod clipboard;
@@ -38,6 +39,7 @@ pub use error::Error;
 pub use proxy::Proxy;
 
 use crate::core::backend;
+use crate::core::clipboard::ClipboardKind;
 use crate::core::mouse;
 use crate::core::renderer;
 use crate::core::shell;
@@ -78,15 +80,13 @@ where
     let settings = program.settings();
     let window_settings = program.window();
 
-    let event_loop = EventLoop::with_user_event()
-        .build()
-        .expect("Create event loop");
+    let event_loop = EventLoop::new().expect("Create event loop");
 
     let backend_settings = backend::Settings::from(&settings);
     let renderer_settings = renderer::Settings::from(&settings);
     let display_handle = event_loop.owned_display_handle();
 
-    let (proxy, worker) = Proxy::new(event_loop.create_proxy());
+    let (proxy, worker, outbox) = Proxy::new(event_loop.create_proxy());
 
     #[cfg(feature = "debug")]
     {
@@ -151,8 +151,11 @@ where
         id: Option<String>,
         sender: mpsc::UnboundedSender<Event<Action<Message>>>,
         receiver: mpsc::UnboundedReceiver<Control>,
+        outbox: mpsc::UnboundedReceiver<Action<Message>>,
         error: Option<Error>,
         system_theme: Option<oneshot::Sender<theme::Mode>>,
+        drag: Option<DragSession>,
+        clipboard: Clipboard,
 
         #[cfg(target_arch = "wasm32")]
         canvas: Option<web_sys::HtmlCanvasElement>,
@@ -164,8 +167,11 @@ where
         id: settings.id,
         sender: event_sender,
         receiver: control_receiver,
+        outbox,
         error: None,
         system_theme: Some(system_theme_sender),
+        drag: None,
+        clipboard: Clipboard::new(),
 
         #[cfg(target_arch = "wasm32")]
         canvas: None,
@@ -173,8 +179,8 @@ where
 
     boot_span.finish();
 
-    impl<Message> winit::application::ApplicationHandler<Action<Message>> for Runner<Message> {
-        fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    impl<Message> winit::application::ApplicationHandler for Runner<Message> {
+        fn resumed(&mut self, event_loop: &dyn winit::event_loop::ActiveEventLoop) {
             if let Some(sender) = self.system_theme.take() {
                 let _ = sender.send(
                     event_loop
@@ -185,33 +191,47 @@ where
             }
         }
 
+        fn can_create_surfaces(&mut self, _event_loop: &dyn winit::event_loop::ActiveEventLoop) {}
+
         fn new_events(
             &mut self,
-            event_loop: &winit::event_loop::ActiveEventLoop,
+            event_loop: &dyn winit::event_loop::ActiveEventLoop,
             cause: winit::event::StartCause,
         ) {
             self.process_event(
                 event_loop,
-                Event::EventLoopAwakened(winit::event::Event::NewEvents(cause)),
+                Event::EventLoopAwakened(EventLoopEvent::NewEvents(cause)),
             );
         }
 
         fn window_event(
             &mut self,
-            event_loop: &winit::event_loop::ActiveEventLoop,
+            event_loop: &dyn winit::event_loop::ActiveEventLoop,
             window_id: winit::window::WindowId,
             event: winit::event::WindowEvent,
         ) {
             #[cfg(target_os = "windows")]
             let is_move_or_resize = matches!(
                 event,
-                winit::event::WindowEvent::Resized(_) | winit::event::WindowEvent::Moved(_)
+                winit::event::WindowEvent::SurfaceResized(_) | winit::event::WindowEvent::Moved(_)
             );
 
-            self.process_event(
-                event_loop,
-                Event::EventLoopAwakened(winit::event::Event::WindowEvent { window_id, event }),
-            );
+            match event {
+                winit::event::WindowEvent::DataTransferReceived { serial, value, .. }
+                    if self.clipboard.receive(serial, value.as_ref()) => {}
+                event @ (winit::event::WindowEvent::DragEntered { .. }
+                | winit::event::WindowEvent::DragDropped { .. }
+                | winit::event::WindowEvent::DragLeft { .. }
+                | winit::event::WindowEvent::DataTransferReceived { .. }) => {
+                    self.handle_drag_event(event_loop, window_id, event);
+                }
+                event => {
+                    self.process_event(
+                        event_loop,
+                        Event::EventLoopAwakened(EventLoopEvent::WindowEvent { window_id, event }),
+                    );
+                }
+            }
 
             // TODO: Remove when unnecessary
             // On Windows, we emulate an `AboutToWait` event after every `Resized` event
@@ -222,36 +242,25 @@ where
                 if is_move_or_resize {
                     self.process_event(
                         event_loop,
-                        Event::EventLoopAwakened(winit::event::Event::AboutToWait),
+                        Event::EventLoopAwakened(EventLoopEvent::AboutToWait),
                     );
                 }
             }
         }
 
-        fn user_event(
-            &mut self,
-            event_loop: &winit::event_loop::ActiveEventLoop,
-            action: Action<Message>,
-        ) {
-            self.process_event(
-                event_loop,
-                Event::EventLoopAwakened(winit::event::Event::UserEvent(action)),
-            );
+        fn proxy_wake_up(&mut self, event_loop: &dyn winit::event_loop::ActiveEventLoop) {
+            while let Ok(action) = self.outbox.try_recv() {
+                self.process_event(
+                    event_loop,
+                    Event::EventLoopAwakened(EventLoopEvent::UserEvent(action)),
+                );
+            }
         }
 
-        fn received_url(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, url: String) {
+        fn about_to_wait(&mut self, event_loop: &dyn winit::event_loop::ActiveEventLoop) {
             self.process_event(
                 event_loop,
-                Event::EventLoopAwakened(winit::event::Event::PlatformSpecific(
-                    winit::event::PlatformSpecific::MacOS(winit::event::MacOS::ReceivedUrl(url)),
-                )),
-            );
-        }
-
-        fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-            self.process_event(
-                event_loop,
-                Event::EventLoopAwakened(winit::event::Event::AboutToWait),
+                Event::EventLoopAwakened(EventLoopEvent::AboutToWait),
             );
         }
     }
@@ -259,7 +268,7 @@ where
     impl<Message> Runner<Message> {
         fn process_event(
             &mut self,
-            event_loop: &winit::event_loop::ActiveEventLoop,
+            event_loop: &dyn winit::event_loop::ActiveEventLoop,
             event: Event<Action<Message>>,
         ) {
             if event_loop.exiting() {
@@ -315,8 +324,13 @@ where
 
                                 #[cfg(target_arch = "wasm32")]
                                 let window_attributes = {
-                                    use winit::platform::web::WindowAttributesExtWebSys;
-                                    window_attributes.with_canvas(self.canvas.take())
+                                    use winit::platform::web::WindowAttributesWeb;
+                                    let attributes = winit::window::WindowAttributes::default()
+                                        .with_platform_attributes(Box::new(
+                                            WindowAttributesWeb::default()
+                                                .with_canvas(self.canvas.take()),
+                                        ));
+                                    attributes
                                 };
 
                                 log::info!(
@@ -343,7 +357,7 @@ where
 
                                 #[cfg(target_arch = "wasm32")]
                                 {
-                                    use winit::platform::web::WindowExtWebSys;
+                                    use winit::platform::web::WindowExtWeb;
 
                                     let canvas = window.canvas().expect("Get window canvas");
 
@@ -380,7 +394,7 @@ where
                                     event_loop,
                                     Event::WindowCreated {
                                         id,
-                                        window: Arc::new(window),
+                                        window: Arc::from(window),
                                         exit_on_close_request,
                                         make_visible: visible,
                                         on_open,
@@ -403,6 +417,9 @@ where
                                     event_loop.set_allows_automatic_window_tabbing(_enabled);
                                 }
                             }
+                            Control::Clipboard(request) => {
+                                self.clipboard.run(event_loop, request);
+                            }
                         },
                         _ => {
                             break;
@@ -415,20 +432,140 @@ where
                 };
             }
         }
+
+        fn handle_drag_event(
+            &mut self,
+            event_loop: &dyn winit::event_loop::ActiveEventLoop,
+            window_id: winit::window::WindowId,
+            event: winit::event::WindowEvent,
+        ) {
+            use winit::data_transfer::TypeHint;
+            use winit::event_loop::DndAction;
+
+            match event {
+                winit::event::WindowEvent::DragEntered { id, .. } => {
+                    let _ = event_loop.set_valid_dnd_actions(id, &[DndAction::Copy]);
+
+                    self.drag = Some(DragSession {
+                        window_id,
+                        id,
+                        path: None,
+                        dropped: false,
+                    });
+
+                    let _ = event_loop.fetch_data_transfer(id, &TypeHint::UriList);
+                }
+                winit::event::WindowEvent::DataTransferReceived { id, value, .. } => {
+                    let Some(drag) = &mut self.drag else {
+                        return;
+                    };
+
+                    if drag.id != id || drag.path.is_some() || drag.window_id != window_id {
+                        return;
+                    }
+
+                    let paths = match value.try_as_uris() {
+                        Ok(paths) => paths
+                            .into_iter()
+                            .filter_map(|s| Url::parse(&s).ok())
+                            .filter(|uri| uri.scheme() == "file")
+                            .filter_map(|uri| uri.to_file_path().ok())
+                            .collect::<Vec<_>>(),
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            let _ = event_loop.fetch_data_transfer(id, &TypeHint::UriList);
+
+                            return;
+                        }
+                        Err(_) => return,
+                    };
+
+                    if drag.dropped {
+                        self.drag = None;
+
+                        for path in paths {
+                            let _ = self.sender.start_send(Event::EventLoopAwakened(
+                                EventLoopEvent::FileEvent {
+                                    window_id,
+                                    event: crate::core::Event::Window(window::Event::FileDropped(
+                                        path,
+                                    )),
+                                },
+                            ));
+                        }
+                    } else {
+                        drag.path = Some(paths.clone());
+
+                        for path in paths {
+                            let _ = self.sender.start_send(Event::EventLoopAwakened(
+                                EventLoopEvent::FileEvent {
+                                    window_id,
+                                    event: crate::core::Event::Window(window::Event::FileHovered(
+                                        path,
+                                    )),
+                                },
+                            ));
+                        }
+                    }
+                }
+                winit::event::WindowEvent::DragDropped { id, .. } => {
+                    let Some(drag) = &mut self.drag else {
+                        return;
+                    };
+
+                    if drag.id != id || drag.window_id != window_id {
+                        return;
+                    }
+
+                    if let Some(path) = drag.path.take() {
+                        self.drag = None;
+
+                        for path in path {
+                            let _ = self.sender.start_send(Event::EventLoopAwakened(
+                                EventLoopEvent::FileEvent {
+                                    window_id,
+                                    event: crate::core::Event::Window(window::Event::FileDropped(
+                                        path,
+                                    )),
+                                },
+                            ));
+                        }
+                    } else {
+                        drag.dropped = true;
+
+                        let _ = event_loop.fetch_data_transfer(id, &TypeHint::UriList);
+                    }
+                }
+                winit::event::WindowEvent::DragLeft { id, .. } => {
+                    if self
+                        .drag
+                        .take_if(|drag| drag.id == id && drag.window_id == window_id)
+                        .is_some()
+                    {
+                        let _ = self.sender.start_send(Event::EventLoopAwakened(
+                            EventLoopEvent::FileEvent {
+                                window_id,
+                                event: crate::core::Event::Window(window::Event::FilesHoveredLeft),
+                            },
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     {
         let mut runner = runner;
-        let _ = event_loop.run_app(&mut runner);
+        let error = runner.error.take();
+        let _ = event_loop.run_app(runner);
 
-        runner.error.map(Err).unwrap_or(Ok(()))
+        error.map(Err).unwrap_or(Ok(()))
     }
 
     #[cfg(target_arch = "wasm32")]
     {
-        use winit::platform::web::EventLoopExtWebSys;
-        let _ = event_loop.spawn_app(runner);
+        let _ = event_loop.run_app(runner).expect("Run application");
 
         Ok(())
     }
@@ -438,13 +575,36 @@ where
 enum Event<Message: 'static> {
     WindowCreated {
         id: window::Id,
-        window: Arc<winit::window::Window>,
+        window: Arc<dyn winit::window::Window>,
         exit_on_close_request: bool,
         make_visible: bool,
         on_open: oneshot::Sender<window::Id>,
     },
-    EventLoopAwakened(winit::event::Event<Message>),
+    EventLoopAwakened(EventLoopEvent<Message>),
     Exit,
+}
+
+#[derive(Debug)]
+enum EventLoopEvent<Message: 'static> {
+    NewEvents(winit::event::StartCause),
+    UserEvent(Message),
+    WindowEvent {
+        window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    },
+    FileEvent {
+        window_id: winit::window::WindowId,
+        event: crate::core::Event,
+    },
+    AboutToWait,
+}
+
+#[derive(Debug)]
+struct DragSession {
+    window_id: winit::window::WindowId,
+    id: winit::data_transfer::DataTransferId,
+    path: Option<Vec<std::path::PathBuf>>,
+    dropped: bool,
 }
 
 #[derive(Debug)]
@@ -461,6 +621,7 @@ enum Control {
         scale_factor: f32,
     },
     SetAutomaticWindowTabbing(bool),
+    Clipboard(runtime::clipboard::Action),
 }
 
 async fn run_instance<P>(
@@ -492,7 +653,6 @@ async fn run_instance<P>(
 
     let mut ui_caches = FxHashMap::default();
     let mut user_interfaces = ManuallyDrop::new(FxHashMap::default());
-    let mut clipboard = Clipboard::new();
 
     #[cfg(all(feature = "linux-theme-detection", target_os = "linux"))]
     let mut system_theme = {
@@ -680,12 +840,12 @@ async fn run_instance<P>(
             }
             Event::EventLoopAwakened(event) => {
                 match event {
-                    event::Event::NewEvents(event::StartCause::Init) => {
+                    EventLoopEvent::NewEvents(event::StartCause::Init) => {
                         for (_id, window) in window_manager.iter_mut() {
                             window.raw.request_redraw();
                         }
                     }
-                    event::Event::NewEvents(event::StartCause::ResumeTimeReached { .. }) => {
+                    EventLoopEvent::NewEvents(event::StartCause::ResumeTimeReached { .. }) => {
                         let now = Instant::now();
 
                         for (_id, window) in window_manager.iter_mut() {
@@ -705,16 +865,7 @@ async fn run_instance<P>(
                                 control_sender.start_send(Control::ChangeFlow(ControlFlow::Wait));
                         }
                     }
-                    event::Event::PlatformSpecific(event::PlatformSpecific::MacOS(
-                        event::MacOS::ReceivedUrl(url),
-                    )) => {
-                        runtime.broadcast(subscription::Event::PlatformSpecific(
-                            subscription::PlatformSpecific::MacOS(
-                                subscription::MacOS::ReceivedUrl(url),
-                            ),
-                        ));
-                    }
-                    event::Event::UserEvent(action) => {
+                    EventLoopEvent::UserEvent(action) => {
                         run_action(
                             action,
                             &program,
@@ -723,7 +874,6 @@ async fn run_instance<P>(
                             &mut compositor,
                             &mut events,
                             &mut messages,
-                            &mut clipboard,
                             &mut control_sender,
                             &mut user_interfaces,
                             &mut window_manager,
@@ -734,7 +884,7 @@ async fn run_instance<P>(
                         );
                         actions += 1;
                     }
-                    event::Event::WindowEvent {
+                    EventLoopEvent::WindowEvent {
                         window_id: id,
                         event: event::WindowEvent::RedrawRequested,
                         ..
@@ -854,7 +1004,6 @@ async fn run_instance<P>(
                                         &mut compositor,
                                         &mut events,
                                         &mut messages,
-                                        &mut clipboard,
                                         &mut control_sender,
                                         &mut user_interfaces,
                                         &mut window_manager,
@@ -928,7 +1077,7 @@ async fn run_instance<P>(
                             window.request_input_method(input_method);
                             window.update_mouse(mouse_interaction);
 
-                            run_clipboard(&mut proxy, &mut clipboard, clipboard_requests, id);
+                            run_clipboard(&mut runtime, clipboard_requests, id);
                         }
 
                         runtime.broadcast(subscription::Event::Interaction {
@@ -996,7 +1145,7 @@ async fn run_instance<P>(
                             },
                         }
                     }
-                    event::Event::WindowEvent {
+                    EventLoopEvent::WindowEvent {
                         event: window_event,
                         window_id,
                     } => {
@@ -1017,7 +1166,7 @@ async fn run_instance<P>(
                         };
 
                         match window_event {
-                            winit::event::WindowEvent::Resized(_)
+                            winit::event::WindowEvent::SurfaceResized(_)
                             | winit::event::WindowEvent::Occluded(false) => {
                                 window.raw.request_redraw();
                             }
@@ -1045,7 +1194,6 @@ async fn run_instance<P>(
                                 &mut compositor,
                                 &mut events,
                                 &mut messages,
-                                &mut clipboard,
                                 &mut control_sender,
                                 &mut user_interfaces,
                                 &mut window_manager,
@@ -1055,7 +1203,7 @@ async fn run_instance<P>(
                                 &mut renderer_settings,
                             );
                         } else {
-                            window.state.update(&program, &window.raw, &window_event);
+                            window.state.update(&program, &*window.raw, &window_event);
 
                             if let Some(event) = conversion::window_event(
                                 window_event,
@@ -1066,7 +1214,12 @@ async fn run_instance<P>(
                             }
                         }
                     }
-                    event::Event::AboutToWait => {
+                    EventLoopEvent::FileEvent { window_id, event } => {
+                        if let Some((id, _)) = window_manager.get_mut_alias(window_id) {
+                            events.push((id, event));
+                        }
+                    }
+                    EventLoopEvent::AboutToWait => {
                         if actions > 0 {
                             proxy.free_slots(actions);
                             actions = 0;
@@ -1122,12 +1275,7 @@ async fn run_instance<P>(
                                     #[cfg(not(feature = "unconditional-rendering"))]
                                     window.request_redraw(_redraw_request);
 
-                                    run_clipboard(
-                                        &mut proxy,
-                                        &mut clipboard,
-                                        clipboard_requests,
-                                        id,
-                                    );
+                                    run_clipboard(&mut runtime, clipboard_requests, id);
                                 }
                                 user_interface::State::Outdated => {
                                     uis_stale = true;
@@ -1178,7 +1326,6 @@ async fn run_instance<P>(
                                     &mut compositor,
                                     &mut events,
                                     &mut messages,
-                                    &mut clipboard,
                                     &mut control_sender,
                                     &mut user_interfaces,
                                     &mut window_manager,
@@ -1297,7 +1444,6 @@ fn run_action<'a, P, C>(
     compositor: &mut Option<C>,
     events: &mut Vec<(window::Id, core::Event)>,
     messages: &mut shell::Bus<P::Message>,
-    clipboard: &mut Clipboard,
     control_sender: &mut mpsc::UnboundedSender<Control>,
     interfaces: &mut FxHashMap<window::Id, UserInterface<'a, P::Message, P::Theme, P::Renderer>>,
     window_manager: &mut window::Manager<P, C>,
@@ -1312,33 +1458,17 @@ fn run_action<'a, P, C>(
 {
     use crate::core::Renderer as _;
     use crate::runtime::backend;
-    use crate::runtime::clipboard;
     use crate::runtime::window;
 
     match action {
         Action::Output(message) => {
             let _ = messages.push(message);
         }
-        Action::Clipboard(action) => match action {
-            clipboard::Action::Read {
-                clipboard_kind,
-                kind,
-                channel,
-            } => {
-                clipboard.read(clipboard_kind, kind, move |result| {
-                    let _ = channel.send(result);
-                });
-            }
-            clipboard::Action::Write {
-                clipboard_kind,
-                content,
-                channel,
-            } => {
-                clipboard.write(clipboard_kind, content, move |result| {
-                    let _ = channel.send(result);
-                });
-            }
-        },
+        Action::Clipboard(action) => {
+            control_sender
+                .start_send(Control::Clipboard(action))
+                .expect("Send clipboard action");
+        }
         Action::Window(action) => match action {
             window::Action::Open(id, settings, channel) => {
                 let monitor = window_manager.last_monitor();
@@ -1392,46 +1522,52 @@ fn run_action<'a, P, C>(
             }
             window::Action::Resize(id, size) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    let _ = window.raw.request_inner_size(
+                    let _ = window.raw.request_surface_size(
                         winit::dpi::LogicalSize {
                             width: size.width,
                             height: size.height,
                         }
-                        .to_physical::<f32>(f64::from(window.state.scale_factor())),
+                        .to_physical::<f32>(f64::from(window.state.scale_factor()))
+                        .into(),
                     );
                 }
             }
             window::Action::SetMinSize(id, size) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    window.raw.set_min_inner_size(size.map(|size| {
+                    window.raw.set_min_surface_size(size.map(|size| {
                         winit::dpi::LogicalSize {
                             width: size.width,
                             height: size.height,
                         }
                         .to_physical::<f32>(f64::from(window.state.scale_factor()))
+                        .into()
                     }));
                 }
             }
             window::Action::SetMaxSize(id, size) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    window.raw.set_max_inner_size(size.map(|size| {
+                    window.raw.set_max_surface_size(size.map(|size| {
                         winit::dpi::LogicalSize {
                             width: size.width,
                             height: size.height,
                         }
                         .to_physical::<f32>(f64::from(window.state.scale_factor()))
+                        .into()
                     }));
                 }
             }
             window::Action::SetResizeIncrements(id, increments) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    window.raw.set_resize_increments(increments.map(|size| {
-                        winit::dpi::LogicalSize {
-                            width: size.width,
-                            height: size.height,
-                        }
-                        .to_physical::<f32>(f64::from(window.state.scale_factor()))
-                    }));
+                    window
+                        .raw
+                        .set_surface_resize_increments(increments.map(|size| {
+                            winit::dpi::LogicalSize {
+                                width: size.width,
+                                height: size.height,
+                            }
+                            .to_physical::<f32>(f64::from(window.state.scale_factor()))
+                            .into()
+                        }));
                 }
             }
             window::Action::SetResizable(id, resizable) => {
@@ -1489,10 +1625,13 @@ fn run_action<'a, P, C>(
             }
             window::Action::Move(id, position) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    window.raw.set_outer_position(winit::dpi::LogicalPosition {
-                        x: position.x,
-                        y: position.y,
-                    });
+                    window.raw.set_outer_position(
+                        winit::dpi::LogicalPosition {
+                            x: position.x,
+                            y: position.y,
+                        }
+                        .into(),
+                    );
                 }
             }
             window::Action::SetMode(id, mode) => {
@@ -1550,15 +1689,18 @@ fn run_action<'a, P, C>(
                 if let Some(window) = window_manager.get_mut(id)
                     && let mouse::Cursor::Available(point) = window.state.cursor()
                 {
-                    window.raw.show_window_menu(winit::dpi::LogicalPosition {
-                        x: point.x,
-                        y: point.y,
-                    });
+                    window.raw.show_window_menu(
+                        winit::dpi::LogicalPosition {
+                            x: point.x,
+                            y: point.y,
+                        }
+                        .into(),
+                    );
                 }
             }
             window::Action::GetRawId(id, channel) => {
                 if let Some(window) = window_manager.get_mut(id) {
-                    let _ = channel.send(window.raw.id().into());
+                    let _ = channel.send(window.raw.id().into_raw() as u64);
                 }
             }
             window::Action::Run(id, f) => {
@@ -1595,11 +1737,13 @@ fn run_action<'a, P, C>(
             }
             window::Action::GetMonitorSize(id, channel) => {
                 if let Some(window) = window_manager.get(id) {
-                    let size = window.raw.current_monitor().map(|monitor| {
+                    let size = window.raw.current_monitor().and_then(|monitor| {
                         let scale = window.state.scale_factor();
-                        let size = monitor.size().to_logical(f64::from(scale));
+                        let size = monitor
+                            .current_video_mode()
+                            .map(|mode| mode.size().to_logical(f64::from(scale)));
 
-                        Size::new(size.width, size.height)
+                        size.map(|size| Size::new(size.width, size.height))
                     });
 
                     let _ = channel.send(size);
@@ -1660,7 +1804,7 @@ fn run_action<'a, P, C>(
                 for (_id, window) in window_manager.iter_mut() {
                     window.state.update(
                         program,
-                        &window.raw,
+                        &*window.raw,
                         &winit::event::WindowEvent::ThemeChanged(theme),
                     );
                 }
@@ -1828,7 +1972,7 @@ where
     for (id, window) in window_manager.iter_mut() {
         let old_size = window.state.logical_size();
 
-        window.state.synchronize(program, id, &window.raw);
+        window.state.synchronize(program, id, &*window.raw);
 
         let new_size = window.state.logical_size();
 
@@ -1883,7 +2027,7 @@ pub fn user_force_quit(
                     ..
                 },
             ..
-        } if c == "q" && _modifiers.super_key() => true,
+        } if c == "q" && _modifiers.meta_key() => true,
         _ => false,
     }
 }
@@ -1920,31 +2064,42 @@ fn system_information(graphics: compositor::Information) -> system::Information 
     }
 }
 
-fn run_clipboard<Message: Send>(
-    proxy: &mut Proxy<Message>,
-    clipboard: &mut Clipboard,
+fn run_clipboard<Message: Send, E: Executor>(
+    runtime: &mut Runtime<E, Proxy<Message>, Action<Message>>,
     requests: core::Clipboard,
     window: window::Id,
 ) {
-    for (clipboard_kind, kind) in requests.reads {
-        let proxy = proxy.clone();
+    let reads = requests.reads.into_iter().map(move |(clipboard, kind)| {
+        let read = match clipboard {
+            ClipboardKind::Standard => runtime::clipboard::read(kind),
+            ClipboardKind::Primary => runtime::clipboard::read_primary(kind),
+        };
 
-        clipboard.read(clipboard_kind, kind, move |result| {
-            proxy.send_action(Action::Event {
+        read.then(move |result| {
+            runtime::task::effect(Action::Event {
                 window,
-                event: core::Event::Clipboard(core::clipboard::Event::Read(result.map(Arc::new))),
-            });
-        });
-    }
+                event: core::Event::Clipboard(core::clipboard::Event::Read(result)),
+            })
+        })
+    });
 
-    if let Some((clipboard_kind, content)) = requests.write {
-        let proxy = proxy.clone();
+    let write = requests.write.map(|(clipboard, content)| {
+        let write = match clipboard {
+            ClipboardKind::Standard => runtime::clipboard::write(content),
+            ClipboardKind::Primary => runtime::clipboard::write_primary(content),
+        };
 
-        clipboard.write(clipboard_kind, content, move |result| {
-            proxy.send_action(Action::Event {
+        write.then(move |result| {
+            runtime::task::effect(Action::Event {
                 window,
                 event: core::Event::Clipboard(core::clipboard::Event::Written(result)),
-            });
-        });
+            })
+        })
+    });
+
+    let task = runtime::task::Task::batch(reads.chain(write));
+
+    if let Some(stream) = runtime::task::into_stream(task) {
+        runtime.run(stream);
     }
 }

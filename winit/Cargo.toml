@@ -19,26 +19,27 @@ debug = ["iced_debug/enable"]
 sysinfo = ["dep:sysinfo"]
 unconditional-rendering = []
 linux-theme-detection = ["dep:mundy", "mundy/async-io", "mundy/color-scheme"]
-image = ["iced_runtime/image", "arboard/image-data"]
+image = ["iced_runtime/image", "dep:image", "image/png"]
 x11 = ["winit/x11"]
-wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita", "arboard/wayland-data-control"]
+wayland = ["winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita"]
 
 [dependencies]
 iced_debug.workspace = true
 iced_program.workspace = true
 iced_runtime.workspace = true
 
+image.workspace = true
+image.optional = true
+
 log.workspace = true
 rustc-hash.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+url.workspace = true
 winit.workspace = true
 
 sysinfo.workspace = true
 sysinfo.optional = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-arboard.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
